@@ -1,29 +1,29 @@
 # include <iostream>
 # include <Eigen/Dense>
 # include <Eigen/Core>
-#include <random> // 使用 C++11 随机数库
+#include <random> // C++11 난수 라이브러리 사용
 
 
 using namespace std;
 using namespace Eigen;
 
-// 自定义高斯消元法函数
+// 사용자 정의 가우스 소거법 함수
 VectorXd gaussianElimination(const MatrixXd& A, const VectorXd& b) {
-    const Index n = A.rows(); // 矩阵的行数（即方程个数）
+    const Index n = A.rows(); // 행렬의 행 수 (즉 방정식의 개수)
 
-    // 将 A 和 b 合并为增广矩阵 [A | b]
+    // A 와 b 를 합쳐 첨가행렬 [A | b] 로 만들기
     MatrixXd augmented(n, n + 1);
     augmented << A, b;
 
-    // 消元阶段：将矩阵 A 转化为上三角矩阵
+    // 소거 단계: 행렬 A 를 상삼각행렬로 변환
     for (Index k = 0; k < n; ++k) {
-        // 1. 选主元：确保当前对角线元素非零
+        // 1. 주원소(pivot) 선택: 현재 대각선 원소가 0이 아닌지 확인
         for (Index i = k + 1; i < n; ++i) {
             if (augmented(k, k) == 0) {
                 cerr << "Zero pivot encountered. Matrix is singular!" << endl;
                 exit(EXIT_FAILURE);
             }
-            // 2. 消去第 k 列的第 i 行元素
+            // 2. k 열의 i 행 원소를 소거
             const double factor = augmented(i, k) / augmented(k, k);
             for (Index j = k; j <= n; ++j) {
                 augmented(i, j) -= factor * augmented(k, j);
@@ -31,7 +31,7 @@ VectorXd gaussianElimination(const MatrixXd& A, const VectorXd& b) {
         }
     }
 
-    // 回代阶段：从最后一行开始，求解未知数
+    // 후진 대입 단계: 마지막 행부터 미지수를 순서대로 풀기
     VectorXd x(n);
     for (Index i = n - 1; i >= 0; --i) {
         x(i) = augmented(i, n);
@@ -47,16 +47,16 @@ VectorXd gaussianElimination(const MatrixXd& A, const VectorXd& b) {
 int main() {
     cout.precision(3); // 限制精确度
 
-    std::random_device rd;                          // 获取一个高质量的随机种子
-    std::default_random_engine generator(rd());     // 初始化随机数生成器
-    std::uniform_real_distribution<double> distribution(-1.0, 1.0); // 均匀分布 [-1, 1]
+    std::random_device rd;                          // 고품질 난수 시드 획득
+    std::default_random_engine generator(rd());     // 난수 생성기 초기화
+    std::uniform_real_distribution<double> distribution(-1.0, 1.0); // 균등 분포 [-1, 1]
 
-    // 初始化 Eigen 矩阵
-    MatrixXd B1(3, 3); // 生成一个 rows x cols 的矩阵
+    // Eigen 행렬 초기화
+    MatrixXd B1(3, 3); // rows x cols 크기의 행렬 생성
 
     for (int i = 0; i < 3; ++i) {
         for (int j = 0; j < 3; ++j) {
-            B1(i, j) = distribution(generator); // 填充每个元素
+            B1(i, j) = distribution(generator); // 각 원소를 난수로 채우기
         }
     }
 
@@ -69,7 +69,7 @@ int main() {
 
   const VectorXd b1 = VectorXd::Random(3,1);
 
-    // 1.1 调用自定义高斯消元法（Gaussian Elimination）函数
+    // 1.1 사용자 정의 가우스 소거법(Gaussian Elimination) 함수 호출
     const VectorXd gex = gaussianElimination(A1, b1);
 
     // 输出解

@@ -1,6 +1,6 @@
 #pragma once
 
-/// 从文件读入BAL dataset
+/// 파일에서 BAL 데이터셋을 읽어옵니다
 class BALProblem {
 public:
     /// load bal data from text file
@@ -49,7 +49,7 @@ public:
 
     const double *points() const { return parameters_ + camera_block_size() * num_cameras_; }
 
-    /// camera参数的起始地址
+    /// 카메라 파라미터의 시작 주소
     double *mutable_cameras() { return parameters_; }
 
     double *mutable_points() { return parameters_ + camera_block_size() * num_cameras_; }
@@ -85,8 +85,8 @@ private:
     int num_parameters_;
     bool use_quaternions_;
 
-    int *point_index_;      // 每个observation对应的point index
-    int *camera_index_;     // 每个observation对应的camera index
+    int *point_index_;      // 각 observation 에 대응하는 point index
+    int *camera_index_;     // 각 observation 에 대응하는 camera index
     double *observations_;
     double *parameters_;
 };

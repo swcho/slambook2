@@ -32,7 +32,7 @@ void Backend::BackendLoop() {
         std::unique_lock<std::mutex> lock(data_mutex_);
         map_update_.wait(lock);
 
-        /// 后端仅优化激活的Frames和Landmarks
+        /// 백엔드는 활성화된 프레임과 랜드마크만 최적화합니다
         Map::KeyframesType active_kfs = map_->GetActiveKeyFrames();
         Map::LandmarksType active_landmarks = map_->GetActiveMapPoints();
         Optimize(active_kfs, active_landmarks);
@@ -51,7 +51,7 @@ void Backend::Optimize(Map::KeyframesType &keyframes,
     g2o::SparseOptimizer optimizer;
     optimizer.setAlgorithm(solver);
 
-    // pose 顶点，使用Keyframe id
+    // 포즈 정점, Keyframe id 사용
     std::map<unsigned long, VertexPose *> vertices;
     unsigned long max_kf_id = 0;
     for (auto &keyframe : keyframes) {
@@ -67,17 +67,17 @@ void Backend::Optimize(Map::KeyframesType &keyframes,
         vertices.insert({kf->keyframe_id_, vertex_pose});
     }
 
-    // 路标顶点，使用路标id索引
+    // 랜드마크 정점, 랜드마크 id 로 인덱싱
     std::map<unsigned long, VertexXYZ *> vertices_landmarks;
 
-    // K 和左右外参
+    // K 와 좌우 외부 파라미터
     Mat33 K = cam_left_->K();
     SE3 left_ext = cam_left_->pose();
     SE3 right_ext = cam_right_->pose();
 
     // edges
     int index = 1;
-    double chi2_th = 5.991;  // robust kernel 阈值
+    double chi2_th = 5.991;  // robust kernel 임계값
     std::map<EdgeProjection *, Feature::Ptr> edges_and_features;
 
     for (auto &landmark : landmarks) {
@@ -97,7 +97,7 @@ void Backend::Optimize(Map::KeyframesType &keyframes,
                 edge = new EdgeProjection(K, right_ext);
             }
 
-            // 如果landmark还没有被加入优化，则新加一个顶点
+            // 랜드마크가 아직 최적화에 추가되지 않았다면 새 정점을 추가합니다
             if (vertices_landmarks.find(landmark_id) ==
                 vertices_landmarks.end()) {
                 VertexXYZ *v = new VertexXYZ;

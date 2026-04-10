@@ -24,7 +24,7 @@ void triangulation(
   vector<Point3d> &points
 );
 
-/// 作图用
+/// 시각화용 함수
 inline cv::Scalar get_color(float depth) {
   float up_th = 50, low_th = 10, th_range = up_th - low_th;
   if (depth > up_th) depth = up_th;
@@ -32,7 +32,7 @@ inline cv::Scalar get_color(float depth) {
   return cv::Scalar(255 * depth / th_range, 0, 255 * (1 - depth / th_range));
 }
 
-// 像素坐标转相机归一化坐标
+// 픽셀 좌표를 카메라 정규화 좌표로 변환
 Point2f pixel2cam(const Point2d &p, const Mat &K);
 
 int main(int argc, char **argv) {
@@ -40,35 +40,35 @@ int main(int argc, char **argv) {
     cout << "usage: triangulation img1 img2" << endl;
     return 1;
   }
-  //-- 读取图像
+  //-- 이미지 읽기
   Mat img_1 = imread(argv[1], CV_LOAD_IMAGE_COLOR);
   Mat img_2 = imread(argv[2], CV_LOAD_IMAGE_COLOR);
 
   vector<KeyPoint> keypoints_1, keypoints_2;
   vector<DMatch> matches;
   find_feature_matches(img_1, img_2, keypoints_1, keypoints_2, matches);
-  cout << "一共找到了" << matches.size() << "组匹配点" << endl;
+  cout << "총 " << matches.size() << " 개의 매칭 쌍을 찾았습니다" << endl;
 
-  //-- 估计两张图像间运动
+  //-- 두 이미지 간의 운동 추정
   Mat R, t;
   pose_estimation_2d2d(keypoints_1, keypoints_2, matches, R, t);
 
-  //-- 三角化
+  //-- 삼각화
   vector<Point3d> points;
   triangulation(keypoints_1, keypoints_2, matches, R, t, points);
 
-  //-- 验证三角化点与特征点的重投影关系
+  //-- 삼각화된 점과 특징점의 재투영 관계를 검증합니다
   Mat K = (Mat_<double>(3, 3) << 520.9, 0, 325.1, 0, 521.0, 249.7, 0, 0, 1);
   Mat img1_plot = img_1.clone();
   Mat img2_plot = img_2.clone();
   for (int i = 0; i < matches.size(); i++) {
-    // 第一个图
+    // 첫 번째 이미지
     float depth1 = points[i].z;
     cout << "depth: " << depth1 << endl;
     Point2d pt1_cam = pixel2cam(keypoints_1[matches[i].queryIdx].pt, K);
     cv::circle(img1_plot, keypoints_1[matches[i].queryIdx].pt, 2, get_color(depth1), 2);
 
-    // 第二个图
+    // 두 번째 이미지
     Mat pt2_trans = R * (Mat_<double>(3, 1) << points[i].x, points[i].y, points[i].z) + t;
     float depth2 = pt2_trans.at<double>(2, 0);
     cv::circle(img2_plot, keypoints_2[matches[i].trainIdx].pt, 2, get_color(depth2), 2);
@@ -84,7 +84,7 @@ void find_feature_matches(const Mat &img_1, const Mat &img_2,
                           std::vector<KeyPoint> &keypoints_1,
                           std::vector<KeyPoint> &keypoints_2,
                           std::vector<DMatch> &matches) {
-  //-- 初始化
+  //-- 초기화
   Mat descriptors_1, descriptors_2;
   // used in OpenCV3
   Ptr<FeatureDetector> detector = ORB::create();
@@ -93,23 +93,23 @@ void find_feature_matches(const Mat &img_1, const Mat &img_2,
   // Ptr<FeatureDetector> detector = FeatureDetector::create ( "ORB" );
   // Ptr<DescriptorExtractor> descriptor = DescriptorExtractor::create ( "ORB" );
   Ptr<DescriptorMatcher> matcher = DescriptorMatcher::create("BruteForce-Hamming");
-  //-- 第一步:检测 Oriented FAST 角点位置
+  //-- 1단계: Oriented FAST 코너점 위치를 검출합니다
   detector->detect(img_1, keypoints_1);
   detector->detect(img_2, keypoints_2);
 
-  //-- 第二步:根据角点位置计算 BRIEF 描述子
+  //-- 2단계: 코너점 위치를 기반으로 BRIEF 디스크립터를 계산합니다
   descriptor->compute(img_1, keypoints_1, descriptors_1);
   descriptor->compute(img_2, keypoints_2, descriptors_2);
 
-  //-- 第三步:对两幅图像中的BRIEF描述子进行匹配，使用 Hamming 距离
+  //-- 3단계: 두 이미지의 BRIEF 디스크립터를 Hamming 거리로 매칭합니다
   vector<DMatch> match;
   // BFMatcher matcher ( NORM_HAMMING );
   matcher->match(descriptors_1, descriptors_2, match);
 
-  //-- 第四步:匹配点对筛选
+  //-- 4단계: 매칭 쌍을 필터링합니다
   double min_dist = 10000, max_dist = 0;
 
-  //找出所有匹配之间的最小距离和最大距离, 即是最相似的和最不相似的两组点之间的距离
+  // 모든 매칭의 최소 거리와 최대 거리를 찾습니다 (가장 유사한 쌍과 가장 유사하지 않은 쌍의 거리)
   for (int i = 0; i < descriptors_1.rows; i++) {
     double dist = match[i].distance;
     if (dist < min_dist) min_dist = dist;
@@ -119,7 +119,7 @@ void find_feature_matches(const Mat &img_1, const Mat &img_2,
   printf("-- Max dist : %f \n", max_dist);
   printf("-- Min dist : %f \n", min_dist);
 
-  //当描述子之间的距离大于两倍的最小距离时,即认为匹配有误.但有时候最小距离会非常小,设置一个经验值30作为下限.
+  // 디스크립터 간 거리가 최솟값의 두 배보다 크면 잘못된 매칭으로 간주합니다. 최솟값이 매우 작을 경우를 대비해 경험적 하한값으로 30을 사용합니다.
   for (int i = 0; i < descriptors_1.rows; i++) {
     if (match[i].distance <= max(2 * min_dist, 30.0)) {
       matches.push_back(match[i]);
@@ -132,10 +132,10 @@ void pose_estimation_2d2d(
   const std::vector<KeyPoint> &keypoints_2,
   const std::vector<DMatch> &matches,
   Mat &R, Mat &t) {
-  // 相机内参,TUM Freiburg2
+  // 카메라 내부 파라미터, TUM Freiburg2
   Mat K = (Mat_<double>(3, 3) << 520.9, 0, 325.1, 0, 521.0, 249.7, 0, 0, 1);
 
-  //-- 把匹配点转换为vector<Point2f>的形式
+  //-- 매칭 점을 vector<Point2f> 형태로 변환합니다
   vector<Point2f> points1;
   vector<Point2f> points2;
 
@@ -144,13 +144,13 @@ void pose_estimation_2d2d(
     points2.push_back(keypoints_2[matches[i].trainIdx].pt);
   }
 
-  //-- 计算本质矩阵
-  Point2d principal_point(325.1, 249.7);        //相机主点, TUM dataset标定值
-  int focal_length = 521;            //相机焦距, TUM dataset标定值
+  //-- 본질 행렬 계산
+  Point2d principal_point(325.1, 249.7);        // 카메라 주점, TUM dataset 캘리브레이션 값
+  int focal_length = 521;            // 카메라 초점 거리, TUM dataset 캘리브레이션 값
   Mat essential_matrix;
   essential_matrix = findEssentialMat(points1, points2, focal_length, principal_point);
 
-  //-- 从本质矩阵中恢复旋转和平移信息.
+  //-- 본질 행렬에서 회전 및 평행이동 정보를 복원합니다
   recoverPose(essential_matrix, points1, points2, R, t, focal_length, principal_point);
 }
 
@@ -173,7 +173,7 @@ void triangulation(
   Mat K = (Mat_<double>(3, 3) << 520.9, 0, 325.1, 0, 521.0, 249.7, 0, 0, 1);
   vector<Point2f> pts_1, pts_2;
   for (DMatch m:matches) {
-    // 将像素坐标转换至相机坐标
+    // 픽셀 좌표를 카메라 좌표계로 변환
     pts_1.push_back(pixel2cam(keypoint_1[m.queryIdx].pt, K));
     pts_2.push_back(pixel2cam(keypoint_2[m.trainIdx].pt, K));
   }
@@ -181,10 +181,10 @@ void triangulation(
   Mat pts_4d;
   cv::triangulatePoints(T1, T2, pts_1, pts_2, pts_4d);
 
-  // 转换成非齐次坐标
+  // 비동차 좌표로 변환
   for (int i = 0; i < pts_4d.cols; i++) {
     Mat x = pts_4d.col(i);
-    x /= x.at<float>(3, 0); // 归一化
+    x /= x.at<float>(3, 0); // 정규화
     Point3d p(
       x.at<float>(0, 0),
       x.at<float>(1, 0),
@@ -201,4 +201,3 @@ Point2f pixel2cam(const Point2d &p, const Mat &K) {
       (p.y - K.at<double>(1, 2)) / K.at<double>(1, 1)
     );
 }
-

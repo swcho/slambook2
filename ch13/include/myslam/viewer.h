@@ -15,7 +15,7 @@
 namespace myslam {
 
 /**
- * 可视化
+ * 시각화
  */
 class Viewer {
    public:
@@ -28,10 +28,10 @@ class Viewer {
 
     void Close();
 
-    // 增加一个当前帧
+    // 현재 프레임을 추가합니다
     void AddCurrentFrame(Frame::Ptr current_frame);
 
-    // 更新地图
+    // 지도를 업데이트합니다
     void UpdateMap();
 
    private:

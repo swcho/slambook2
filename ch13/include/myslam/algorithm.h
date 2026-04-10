@@ -31,7 +31,7 @@ inline bool triangulation(const std::vector<SE3> &poses,
     pt_world = (svd.matrixV().col(3) / svd.matrixV()(3, 3)).head<3>();
 
     if (svd.singularValues()[3] / svd.singularValues()[2] < 1e-2) {
-        // 解质量不好，放弃
+        // 해의 품질이 좋지 않아 포기합니다
         return true;
     }
     return false;

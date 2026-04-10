@@ -10,7 +10,7 @@ using namespace cv;
 using namespace std;
 
 /***************************************************
- * 本节演示了如何根据前面训练的字典计算相似性评分
+ * 이 절에서는 앞서 훈련한 사전(vocabulary)을 이용해 유사도 점수를 계산하는 방법을 보여줍니다
  * ************************************************/
 int main(int argc, char **argv) {
     // read the images and database  

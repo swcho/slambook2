@@ -9,8 +9,9 @@
 namespace myslam {
 
 /**
- * @brief 地图
- * 和地图的交互：前端调用InsertKeyframe和InsertMapPoint插入新帧和地图点，后端维护地图的结构，判定outlier/剔除等等
+ * @brief 지도
+ * 지도와의 상호작용: 프론트엔드는 InsertKeyframe 과 InsertMapPoint 를 호출해 새 프레임과 지도 점을 삽입하고,
+ * 백엔드는 지도 구조를 유지하며 outlier 를 판별하고 제거합니다
  */
 class Map {
    public:
@@ -21,39 +22,39 @@ class Map {
 
     Map() {}
 
-    /// 增加一个关键帧
+    /// 키프레임을 추가합니다
     void InsertKeyFrame(Frame::Ptr frame);
-    /// 增加一个地图顶点
+    /// 지도 점(landmark)을 추가합니다
     void InsertMapPoint(MapPoint::Ptr map_point);
 
-    /// 获取所有地图点
+    /// 모든 지도 점을 가져옵니다
     LandmarksType GetAllMapPoints() {
         std::unique_lock<std::mutex> lck(data_mutex_);
         return landmarks_;
     }
-    /// 获取所有关键帧
+    /// 모든 키프레임을 가져옵니다
     KeyframesType GetAllKeyFrames() {
         std::unique_lock<std::mutex> lck(data_mutex_);
         return keyframes_;
     }
 
-    /// 获取激活地图点
+    /// 활성화된 지도 점을 가져옵니다
     LandmarksType GetActiveMapPoints() {
         std::unique_lock<std::mutex> lck(data_mutex_);
         return active_landmarks_;
     }
 
-    /// 获取激活关键帧
+    /// 활성화된 키프레임을 가져옵니다
     KeyframesType GetActiveKeyFrames() {
         std::unique_lock<std::mutex> lck(data_mutex_);
         return active_keyframes_;
     }
 
-    /// 清理map中观测数量为零的点
+    /// 관측 횟수가 0인 점을 지도에서 제거합니다
     void CleanMap();
 
    private:
-    // 将旧的关键帧置为不活跃状态
+    // 오래된 키프레임을 비활성 상태로 만듭니다
     void RemoveOldKeyframe();
 
     std::mutex data_mutex_;
@@ -65,7 +66,7 @@ class Map {
     Frame::Ptr current_frame_ = nullptr;
 
     // settings
-    int num_active_keyframes_ = 7;  // 激活的关键帧数量
+    int num_active_keyframes_ = 7;  // 활성화된 키프레임 수
 };
 }  // namespace myslam
 

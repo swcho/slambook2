@@ -8,41 +8,41 @@
 using namespace std;
 using namespace Eigen;
 
-// 文件路径
+// 파일 경로
 string left_file = "./left.png";
 string right_file = "./right.png";
 
-// 在pangolin中画图，已写好，无需调整
+// pangolin 에서 그림을 그립니다. 이미 작성되어 있으므로 수정할 필요가 없습니다
 void showPointCloud(
     const vector<Vector4d, Eigen::aligned_allocator<Vector4d>> &pointcloud);
 
 int main(int argc, char **argv) {
 
-    // 内参
+    // 내부 파라미터
     double fx = 718.856, fy = 718.856, cx = 607.1928, cy = 185.2157;
-    // 基线
+    // 기선 거리
     double b = 0.573;
 
-    // 读取图像
+    // 이미지 읽기
     cv::Mat left = cv::imread(left_file, 0);
     cv::Mat right = cv::imread(right_file, 0);
     cv::Ptr<cv::StereoSGBM> sgbm = cv::StereoSGBM::create(
-        0, 96, 9, 8 * 9 * 9, 32 * 9 * 9, 1, 63, 10, 100, 32);    // 神奇的参数
+        0, 96, 9, 8 * 9 * 9, 32 * 9 * 9, 1, 63, 10, 100, 32);    // 경험적 파라미터
     cv::Mat disparity_sgbm, disparity;
     sgbm->compute(left, right, disparity_sgbm);
     disparity_sgbm.convertTo(disparity, CV_32F, 1.0 / 16.0f);
 
-    // 生成点云
+    // 포인트 클라우드 생성
     vector<Vector4d, Eigen::aligned_allocator<Vector4d>> pointcloud;
 
-    // 如果你的机器慢，请把后面的v++和u++改成v+=2, u+=2
+    // 컴퓨터가 느리면 v++, u++ 를 v+=2, u+=2 로 변경하세요
     for (int v = 0; v < left.rows; v++)
         for (int u = 0; u < left.cols; u++) {
             if (disparity.at<float>(v, u) <= 0.0 || disparity.at<float>(v, u) >= 96.0) continue;
 
-            Vector4d point(0, 0, 0, left.at<uchar>(v, u) / 255.0); // 前三维为xyz,第四维为颜色
+            Vector4d point(0, 0, 0, left.at<uchar>(v, u) / 255.0); // 앞 세 차원이 xyz, 네 번째가 색상
 
-            // 根据双目模型计算 point 的位置
+            // 쌍안경 모델로 point 의 위치를 계산합니다
             double x = (u - cx) / fx;
             double y = (v - cy) / fy;
             double depth = fx * b / (disparity.at<float>(v, u));
@@ -55,7 +55,7 @@ int main(int argc, char **argv) {
 
     cv::imshow("disparity", disparity / 96.0);
     cv::waitKey(0);
-    // 画出点云
+    // 포인트 클라우드를 그립니다
     showPointCloud(pointcloud);
     return 0;
 }

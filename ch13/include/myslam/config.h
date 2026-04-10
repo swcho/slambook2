@@ -7,9 +7,9 @@
 namespace myslam {
 
 /**
- * 配置类，使用SetParameterFile确定配置文件
- * 然后用Get得到对应值
- * 单例模式
+ * 설정 클래스. SetParameterFile 로 설정 파일을 지정하고
+ * Get 으로 해당 값을 가져옵니다
+ * 싱글톤 패턴
  */
 class Config {
    private:

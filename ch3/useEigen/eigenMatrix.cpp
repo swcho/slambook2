@@ -3,9 +3,9 @@
 using namespace std;
 
 #include <ctime>
-// Eigen 核心部分
+// Eigen 핵심 모듈
 #include <Eigen/Core>
-// 稠密矩阵的代数运算（逆，特征值等）
+// 밀집 행렬의 대수 연산 (역행렬, 고유값 등)
 #include <Eigen/Dense>
 
 using namespace Eigen;
@@ -13,100 +13,100 @@ using namespace Eigen;
 #define MATRIX_SIZE 50
 
 /****************************
-* 本程序演示了 Eigen 基本类型的使用
+* 이 프로그램은 Eigen 기본 타입의 사용법을 보여줍니다
 ****************************/
 
 int main(int argc, char **argv) {
-  // Eigen 中所有向量和矩阵都是Eigen::Matrix，它是一个模板类。它的前三个参数为：数据类型，行，列
-  // 声明一个2*3的float矩阵
+  // Eigen의 모든 벡터와 행렬은 Eigen::Matrix 템플릿 클래스입니다. 앞 세 파라미터는 데이터 타입, 행, 열입니다
+  // 2x3 float 행렬 선언
   Matrix<float, 2, 3> matrix_23;
 
-  // 同时，Eigen 通过 typedef 提供了许多内置类型，不过底层仍是Eigen::Matrix
-  // 例如 Vector3d 实质上是 Eigen::Matrix<double, 3, 1>，即三维向量
+  // Eigen은 typedef로 다양한 내장 타입을 제공하지만, 내부적으로는 모두 Eigen::Matrix입니다
+  // 예를 들어 Vector3d는 실제로 Eigen::Matrix<double, 3, 1>, 즉 3차원 벡터입니다
   Vector3d v_3d;
-  // 这是一样的
+  // 아래도 동일합니다
   Matrix<float, 3, 1> vd_3d;
 
-  // Matrix3d 实质上是 Eigen::Matrix<double, 3, 3>
-  Matrix3d matrix_33 = Matrix3d::Zero(); //初始化为零
-  // 如果不确定矩阵大小，可以使用动态大小的矩阵
+  // Matrix3d는 실제로 Eigen::Matrix<double, 3, 3>입니다
+  Matrix3d matrix_33 = Matrix3d::Zero(); // 0으로 초기화
+  // 행렬 크기가 불확실한 경우 동적 크기 행렬을 사용할 수 있습니다
   Matrix<double, Dynamic, Dynamic> matrix_dynamic;
-  // 更简单的
+  // 더 간단하게
   MatrixXd matrix_x;
-  // 这种类型还有很多，我们不一一列举
+  // 이 외에도 많은 타입이 있지만 일일이 나열하지 않습니다
 
-  // 下面是对Eigen阵的操作
-  // 输入数据（初始化）
+  // 아래는 Eigen 행렬 연산입니다
+  // 데이터 입력 (초기화)
   matrix_23 << 1, 2, 3, 4, 5, 6;
-  // 输出
+  // 출력
   cout << "matrix 2x3 from 1 to 6: \n" << matrix_23 << endl;
 
-  // 用()访问矩阵中的元素
+  // ()로 행렬 원소에 접근
   cout << "print matrix 2x3: " << endl;
   for (int i = 0; i < 2; i++) {
     for (int j = 0; j < 3; j++) cout << matrix_23(i, j) << "\t";
     cout << endl;
   }
 
-  // 矩阵和向量相乘（实际上仍是矩阵和矩阵）
+  // 행렬과 벡터의 곱셈 (실제로는 행렬과 행렬의 곱)
   v_3d << 3, 2, 1;
   vd_3d << 4, 5, 6;
 
-  // 但是在Eigen里你不能混合两种不同类型的矩阵，像这样是错的
+  // Eigen에서는 서로 다른 타입의 행렬을 혼합할 수 없습니다. 아래처럼 하면 오류가 납니다
   // Matrix<double, 2, 1> result_wrong_type = matrix_23 * v_3d;
-  // 应该显式转换
+  // 명시적으로 타입 변환해야 합니다
   Matrix<double, 2, 1> result = matrix_23.cast<double>() * v_3d;
   cout << "[1,2,3;4,5,6]*[3,2,1]=" << result.transpose() << endl;
 
   Matrix<float, 2, 1> result2 = matrix_23 * vd_3d;
   cout << "[1,2,3;4,5,6]*[4,5,6]: " << result2.transpose() << endl;
 
-  // 同样你不能搞错矩阵的维度
-  // 试着取消下面的注释，看看Eigen会报什么错
+  // 마찬가지로 행렬의 차원도 틀리면 안 됩니다
+  // 아래 주석을 해제하면 Eigen이 어떤 오류를 발생시키는지 확인해 보세요
   // Eigen::Matrix<double, 2, 3> result_wrong_dimension = matrix_23.cast<double>() * v_3d;
 
-  // 一些矩阵运算
-  // 四则运算就不演示了，直接用+-*/即可。
-  matrix_33 = Matrix3d::Random();      // 随机数矩阵
+  // 몇 가지 행렬 연산
+  // 사칙연산은 생략합니다. +-*/를 그대로 사용하면 됩니다
+  matrix_33 = Matrix3d::Random();      // 난수 행렬
   cout << "random matrix: \n" << matrix_33 << endl;
-  cout << "transpose: \n" << matrix_33.transpose() << endl;      // 转置
-  cout << "sum: " << matrix_33.sum() << endl;            // 各元素和
-  cout << "trace: " << matrix_33.trace() << endl;          // 迹
-  cout << "times 10: \n" << 10 * matrix_33 << endl;               // 数乘
-  cout << "inverse: \n" << matrix_33.inverse() << endl;        // 逆
-  cout << "det: " << matrix_33.determinant() << endl;    // 行列式
+  cout << "transpose: \n" << matrix_33.transpose() << endl;      // 전치
+  cout << "sum: " << matrix_33.sum() << endl;            // 원소 합
+  cout << "trace: " << matrix_33.trace() << endl;          // 대각합 (trace)
+  cout << "times 10: \n" << 10 * matrix_33 << endl;               // 스칼라 곱
+  cout << "inverse: \n" << matrix_33.inverse() << endl;        // 역행렬
+  cout << "det: " << matrix_33.determinant() << endl;    // 행렬식
 
-  // 特征值
-  // 实对称矩阵可以保证对角化成功
+  // 고유값
+  // 실수 대칭 행렬은 대각화가 보장됩니다
   SelfAdjointEigenSolver<Matrix3d> eigen_solver(matrix_33.transpose() * matrix_33);
   cout << "Eigen values = \n" << eigen_solver.eigenvalues() << endl;
   cout << "Eigen vectors = \n" << eigen_solver.eigenvectors() << endl;
 
-  // 解方程
-  // 我们求解 matrix_NN * x = v_Nd 这个方程
-  // N的大小在前边的宏里定义，它由随机数生成
-  // 直接求逆自然是最直接的，但是求逆运算量大
+  // 방정식 풀기
+  // matrix_NN * x = v_Nd 를 풉니다
+  // N의 크기는 앞의 매크로에서 정의되며, 난수로 생성됩니다
+  // 직접 역행렬을 구하는 것이 가장 직관적이지만, 연산량이 많습니다
 
   Matrix<double, MATRIX_SIZE, MATRIX_SIZE> matrix_NN
       = MatrixXd::Random(MATRIX_SIZE, MATRIX_SIZE);
-  matrix_NN = matrix_NN * matrix_NN.transpose();  // 保证半正定
+  matrix_NN = matrix_NN * matrix_NN.transpose();  // 반양정치 행렬 보장
   Matrix<double, MATRIX_SIZE, 1> v_Nd = MatrixXd::Random(MATRIX_SIZE, 1);
 
-  clock_t time_stt = clock(); // 计时
-  // 直接求逆
+  clock_t time_stt = clock(); // 시간 측정 시작
+  // 직접 역행렬로 풀기
   Matrix<double, MATRIX_SIZE, 1> x = matrix_NN.inverse() * v_Nd;
   cout << "time of normal inverse is "
        << 1000 * (clock() - time_stt) / (double) CLOCKS_PER_SEC << "ms" << endl;
   cout << "x = " << x.transpose() << endl;
 
-  // 通常用矩阵分解来求，例如QR分解，速度会快很多
+  // 보통 행렬 분해로 풀면 훨씬 빠릅니다. 예: QR 분해
   time_stt = clock();
   x = matrix_NN.colPivHouseholderQr().solve(v_Nd);
   cout << "time of Qr decomposition is "
        << 1000 * (clock() - time_stt) / (double) CLOCKS_PER_SEC << "ms" << endl;
   cout << "x = " << x.transpose() << endl;
 
-  // 对于正定矩阵，还可以用cholesky分解来解方程
+  // 양정치 행렬의 경우 Cholesky 분해(LDLT)로도 풀 수 있습니다
   time_stt = clock();
   x = matrix_NN.ldlt().solve(v_Nd);
   cout << "time of ldlt decomposition is "

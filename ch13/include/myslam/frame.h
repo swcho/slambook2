@@ -13,8 +13,8 @@ struct MapPoint;
 struct Feature;
 
 /**
- * 帧
- * 每一帧分配独立id，关键帧分配关键帧ID
+ * 프레임
+ * 각 프레임에는 독립적인 ID 가 부여되며, 키프레임에는 키프레임 ID 가 부여됩니다
  */
 struct Frame {
    public:
@@ -23,10 +23,10 @@ struct Frame {
 
     unsigned long id_ = 0;           // id of this frame
     unsigned long keyframe_id_ = 0;  // id of key frame
-    bool is_keyframe_ = false;       // 是否为关键帧
-    double time_stamp_;              // 时间戳，暂不使用
-    SE3 pose_;                       // Tcw 形式Pose
-    std::mutex pose_mutex_;          // Pose数据锁
+    bool is_keyframe_ = false;       // 키프레임 여부
+    double time_stamp_;              // 타임스탬프, 현재 사용하지 않음
+    SE3 pose_;                       // Tcw 형태의 포즈
+    std::mutex pose_mutex_;          // 포즈 데이터 잠금
     cv::Mat left_img_, right_img_;   // stereo images
 
     // extracted features in left image
@@ -51,10 +51,10 @@ struct Frame {
         pose_ = pose;
     }
 
-    /// 设置关键帧并分配并键帧id
+    /// 키프레임으로 설정하고 키프레임 ID 를 부여합니다
     void SetKeyFrame();
 
-    /// 工厂构建模式，分配id 
+    /// 팩토리 생성 패턴, ID 를 할당합니다
     static std::shared_ptr<Frame> CreateFrame();
 };
 

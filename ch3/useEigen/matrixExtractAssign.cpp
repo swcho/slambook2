@@ -1,7 +1,7 @@
 # include <iostream>
 # include <Eigen/Core>
 
-#include <random> // 使用 C++11 随机数库
+#include <random> // C++11 난수 라이브러리 사용
 
 
 
@@ -15,20 +15,20 @@ int main(int argc, char **argv) {
     // // 设置随机种子， time（0）作为随机种子不安全
     // srand(static_cast<unsigned int>(time(0)));
 
-    std::random_device rd;                          // 获取一个高质量的随机种子
-    std::default_random_engine generator(rd());     // 初始化随机数生成器
-    std::uniform_real_distribution<double> distribution(-1.0, 1.0); // 均匀分布 [-1, 1]
+    std::random_device rd;                          // 고품질 난수 시드 획득
+    std::default_random_engine generator(rd());     // 난수 생성기 초기화
+    std::uniform_real_distribution<double> distribution(-1.0, 1.0); // 균등 분포 [-1, 1]
 
 
     cout.precision(3);
 
-    // 初始化 Eigen 矩阵
-    MatrixXd bigMatrix(MATRIX_SIZE, MATRIX_SIZE); // 生成一个 rows x cols 的矩阵
+    // Eigen 행렬 초기화
+    MatrixXd bigMatrix(MATRIX_SIZE, MATRIX_SIZE); // rows x cols 크기의 행렬 생성
 
-    // 3. 使用随机数填充矩阵
+    // 3. 난수로 행렬 채우기
     for (int i = 0; i < MATRIX_SIZE; ++i) {
         for (int j = 0; j < MATRIX_SIZE; ++j) {
-            bigMatrix(i, j) = distribution(generator); // 填充每个元素
+            bigMatrix(i, j) = distribution(generator); // 각 원소를 난수로 채우기
         }
     }
 

@@ -9,7 +9,7 @@ using namespace std;
 using namespace cv;
 
 /****************************************************
- * 本程序演示了如何使用2D-2D的特征匹配估计相机运动
+ * 이 프로그램은 2D-2D 특징점 매칭으로 카메라 운동을 추정하는 방법을 보여줍니다
  * **************************************************/
 
 void find_feature_matches(
@@ -24,7 +24,7 @@ void pose_estimation_2d2d(
   std::vector<DMatch> matches,
   Mat &R, Mat &t);
 
-// 像素坐标转相机归一化坐标
+// 픽셀 좌표를 카메라 정규화 좌표로 변환
 Point2d pixel2cam(const Point2d &p, const Mat &K);
 
 int main(int argc, char **argv) {
@@ -32,7 +32,7 @@ int main(int argc, char **argv) {
     cout << "usage: pose_estimation_2d2d img1 img2" << endl;
     return 1;
   }
-  //-- 读取图像
+  //-- 이미지 읽기
   Mat img_1 = imread(argv[1], CV_LOAD_IMAGE_COLOR);
   Mat img_2 = imread(argv[2], CV_LOAD_IMAGE_COLOR);
   assert(img_1.data && img_2.data && "Can not load images!");
@@ -40,13 +40,13 @@ int main(int argc, char **argv) {
   vector<KeyPoint> keypoints_1, keypoints_2;
   vector<DMatch> matches;
   find_feature_matches(img_1, img_2, keypoints_1, keypoints_2, matches);
-  cout << "一共找到了" << matches.size() << "组匹配点" << endl;
+  cout << "총 " << matches.size() << " 개의 매칭 쌍을 찾았습니다" << endl;
 
-  //-- 估计两张图像间运动
+  //-- 두 이미지 간의 운동 추정
   Mat R, t;
   pose_estimation_2d2d(keypoints_1, keypoints_2, matches, R, t);
 
-  //-- 验证E=t^R*scale
+  //-- E=t^R*scale 검증
   Mat t_x =
     (Mat_<double>(3, 3) << 0, -t.at<double>(2, 0), t.at<double>(1, 0),
       t.at<double>(2, 0), 0, -t.at<double>(0, 0),
@@ -54,7 +54,7 @@ int main(int argc, char **argv) {
 
   cout << "t^R=" << endl << t_x * R << endl;
 
-  //-- 验证对极约束
+  //-- 에피폴라 제약 조건 검증
   Mat K = (Mat_<double>(3, 3) << 520.9, 0, 325.1, 0, 521.0, 249.7, 0, 0, 1);
   for (DMatch m: matches) {
     Point2d pt1 = pixel2cam(keypoints_1[m.queryIdx].pt, K);
@@ -71,7 +71,7 @@ void find_feature_matches(const Mat &img_1, const Mat &img_2,
                           std::vector<KeyPoint> &keypoints_1,
                           std::vector<KeyPoint> &keypoints_2,
                           std::vector<DMatch> &matches) {
-  //-- 初始化
+  //-- 초기화
   Mat descriptors_1, descriptors_2;
   // used in OpenCV3
   Ptr<FeatureDetector> detector = ORB::create();
@@ -80,23 +80,23 @@ void find_feature_matches(const Mat &img_1, const Mat &img_2,
   // Ptr<FeatureDetector> detector = FeatureDetector::create ( "ORB" );
   // Ptr<DescriptorExtractor> descriptor = DescriptorExtractor::create ( "ORB" );
   Ptr<DescriptorMatcher> matcher = DescriptorMatcher::create("BruteForce-Hamming");
-  //-- 第一步:检测 Oriented FAST 角点位置
+  //-- 1단계: Oriented FAST 코너점 위치를 검출합니다
   detector->detect(img_1, keypoints_1);
   detector->detect(img_2, keypoints_2);
 
-  //-- 第二步:根据角点位置计算 BRIEF 描述子
+  //-- 2단계: 코너점 위치를 기반으로 BRIEF 디스크립터를 계산합니다
   descriptor->compute(img_1, keypoints_1, descriptors_1);
   descriptor->compute(img_2, keypoints_2, descriptors_2);
 
-  //-- 第三步:对两幅图像中的BRIEF描述子进行匹配，使用 Hamming 距离
+  //-- 3단계: 두 이미지의 BRIEF 디스크립터를 Hamming 거리로 매칭합니다
   vector<DMatch> match;
   //BFMatcher matcher ( NORM_HAMMING );
   matcher->match(descriptors_1, descriptors_2, match);
 
-  //-- 第四步:匹配点对筛选
+  //-- 4단계: 매칭 쌍을 필터링합니다
   double min_dist = 10000, max_dist = 0;
 
-  //找出所有匹配之间的最小距离和最大距离, 即是最相似的和最不相似的两组点之间的距离
+  // 모든 매칭의 최소 거리와 최대 거리를 찾습니다 (가장 유사한 쌍과 가장 유사하지 않은 쌍의 거리)
   for (int i = 0; i < descriptors_1.rows; i++) {
     double dist = match[i].distance;
     if (dist < min_dist) min_dist = dist;
@@ -106,7 +106,7 @@ void find_feature_matches(const Mat &img_1, const Mat &img_2,
   printf("-- Max dist : %f \n", max_dist);
   printf("-- Min dist : %f \n", min_dist);
 
-  //当描述子之间的距离大于两倍的最小距离时,即认为匹配有误.但有时候最小距离会非常小,设置一个经验值30作为下限.
+  // 디스크립터 간 거리가 최솟값의 두 배보다 크면 잘못된 매칭으로 간주합니다. 최솟값이 매우 작을 경우를 대비해 경험적 하한값으로 30을 사용합니다.
   for (int i = 0; i < descriptors_1.rows; i++) {
     if (match[i].distance <= max(2 * min_dist, 30.0)) {
       matches.push_back(match[i]);
@@ -126,10 +126,10 @@ void pose_estimation_2d2d(std::vector<KeyPoint> keypoints_1,
                           std::vector<KeyPoint> keypoints_2,
                           std::vector<DMatch> matches,
                           Mat &R, Mat &t) {
-  // 相机内参,TUM Freiburg2
+  // 카메라 내부 파라미터, TUM Freiburg2
   Mat K = (Mat_<double>(3, 3) << 520.9, 0, 325.1, 0, 521.0, 249.7, 0, 0, 1);
 
-  //-- 把匹配点转换为vector<Point2f>的形式
+  //-- 매칭 점을 vector<Point2f> 형태로 변환합니다
   vector<Point2f> points1;
   vector<Point2f> points2;
 
@@ -138,26 +138,26 @@ void pose_estimation_2d2d(std::vector<KeyPoint> keypoints_1,
     points2.push_back(keypoints_2[matches[i].trainIdx].pt);
   }
 
-  //-- 计算基础矩阵
+  //-- 기초 행렬 계산
   Mat fundamental_matrix;
   fundamental_matrix = findFundamentalMat(points1, points2, CV_FM_8POINT);
   cout << "fundamental_matrix is " << endl << fundamental_matrix << endl;
 
-  //-- 计算本质矩阵
-  Point2d principal_point(325.1, 249.7);  //相机光心, TUM dataset标定值
-  double focal_length = 521;      //相机焦距, TUM dataset标定值
+  //-- 본질 행렬 계산
+  Point2d principal_point(325.1, 249.7);  // 카메라 주점, TUM dataset 캘리브레이션 값
+  double focal_length = 521;      // 카메라 초점 거리, TUM dataset 캘리브레이션 값
   Mat essential_matrix;
   essential_matrix = findEssentialMat(points1, points2, focal_length, principal_point);
   cout << "essential_matrix is " << endl << essential_matrix << endl;
 
-  //-- 计算单应矩阵
-  //-- 但是本例中场景不是平面，单应矩阵意义不大
+  //-- 단응 행렬 계산
+  //-- 이 예시의 장면은 평면이 아니므로 단응 행렬의 의미가 크지 않습니다
   Mat homography_matrix;
   homography_matrix = findHomography(points1, points2, RANSAC, 3);
   cout << "homography_matrix is " << endl << homography_matrix << endl;
 
-  //-- 从本质矩阵中恢复旋转和平移信息.
-  // 此函数仅在Opencv3中提供
+  //-- 본질 행렬에서 회전 및 평행이동 정보를 복원합니다
+  // 이 함수는 OpenCV3 에서만 제공됩니다
   recoverPose(essential_matrix, points1, points2, R, t, focal_length, principal_point);
   cout << "R is " << endl << R << endl;
   cout << "t is " << endl << t << endl;

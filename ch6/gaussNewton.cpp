@@ -8,23 +8,23 @@ using namespace std;
 using namespace Eigen;
 
 int main(int argc, char **argv) {
-  double ar = 1.0, br = 2.0, cr = 1.0;         // 真实参数值
-  double ae = 2.0, be = -1.0, ce = 5.0;        // 估计参数值
-  int N = 100;                                 // 数据点
-  double w_sigma = 1.0;                        // 噪声Sigma值
+  double ar = 1.0, br = 2.0, cr = 1.0;         // 실제 파라미터 값
+  double ae = 2.0, be = -1.0, ce = 5.0;        // 추정 파라미터 값
+  int N = 100;                                 // 데이터 포인트 수
+  double w_sigma = 1.0;                        // 노이즈 Sigma 값
   double inv_sigma = 1.0 / w_sigma;
-  cv::RNG rng;                                 // OpenCV随机数产生器
+  cv::RNG rng;                                 // OpenCV 난수 생성기
 
-  vector<double> x_data, y_data;      // 数据
+  vector<double> x_data, y_data;      // 데이터
   for (int i = 0; i < N; i++) {
     double x = i / 100.0;
     x_data.push_back(x);
     y_data.push_back(exp(ar * x * x + br * x + cr) + rng.gaussian(w_sigma * w_sigma));
   }
 
-  // 开始Gauss-Newton迭代
-  int iterations = 100;    // 迭代次数
-  double cost = 0, lastCost = 0;  // 本次迭代的cost和上一次迭代的cost
+  // Gauss-Newton 반복 시작
+  int iterations = 100;    // 반복 횟수
+  double cost = 0, lastCost = 0;  // 이번 반복의 비용과 이전 반복의 비용
 
   chrono::steady_clock::time_point t1 = chrono::steady_clock::now();
   for (int iter = 0; iter < iterations; iter++) {
@@ -34,9 +34,9 @@ int main(int argc, char **argv) {
     cost = 0;
 
     for (int i = 0; i < N; i++) {
-      double xi = x_data[i], yi = y_data[i];  // 第i个数据点
+      double xi = x_data[i], yi = y_data[i];  // i 번째 데이터 포인트
       double error = yi - exp(ae * xi * xi + be * xi + ce);
-      Vector3d J; // 雅可比矩阵
+      Vector3d J; // 야코비 행렬
       J[0] = -xi * xi * exp(ae * xi * xi + be * xi + ce);  // de/da
       J[1] = -xi * exp(ae * xi * xi + be * xi + ce);  // de/db
       J[2] = -exp(ae * xi * xi + be * xi + ce);  // de/dc
@@ -47,7 +47,7 @@ int main(int argc, char **argv) {
       cost += error * error;
     }
 
-    // 求解线性方程 Hx=b
+    // 선형 방정식 Hx=b 를 풉니다
     Vector3d dx = H.ldlt().solve(b);
     if (isnan(dx[0])) {
       cout << "result is nan!" << endl;

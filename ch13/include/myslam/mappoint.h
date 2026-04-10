@@ -11,8 +11,8 @@ struct Frame;
 struct Feature;
 
 /**
- * 路标点类
- * 特征点在三角化之后形成路标点
+ * 랜드마크 점 클래스
+ * 특징점이 삼각화된 후 랜드마크 점이 됩니다
  */
 struct MapPoint {
    public:

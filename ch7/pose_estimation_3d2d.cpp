@@ -23,7 +23,7 @@ void find_feature_matches(
   std::vector<KeyPoint> &keypoints_2,
   std::vector<DMatch> &matches);
 
-// 像素坐标转相机归一化坐标
+// 픽셀 좌표를 카메라 정규화 좌표로 변환
 Point2d pixel2cam(const Point2d &p, const Mat &K);
 
 // BA by g2o
@@ -50,7 +50,7 @@ int main(int argc, char **argv) {
     cout << "usage: pose_estimation_3d2d img1 img2 depth1 depth2" << endl;
     return 1;
   }
-  //-- 读取图像
+  //-- 이미지 읽기
   Mat img_1 = imread(argv[1], CV_LOAD_IMAGE_COLOR);
   Mat img_2 = imread(argv[2], CV_LOAD_IMAGE_COLOR);
   assert(img_1.data && img_2.data && "Can not load images!");
@@ -58,10 +58,10 @@ int main(int argc, char **argv) {
   vector<KeyPoint> keypoints_1, keypoints_2;
   vector<DMatch> matches;
   find_feature_matches(img_1, img_2, keypoints_1, keypoints_2, matches);
-  cout << "一共找到了" << matches.size() << "组匹配点" << endl;
+  cout << "총 " << matches.size() << " 개의 매칭 쌍을 찾았습니다" << endl;
 
-  // 建立3D点
-  Mat d1 = imread(argv[3], CV_LOAD_IMAGE_UNCHANGED);       // 深度图为16位无符号数，单通道图像
+  // 3D 점 생성
+  Mat d1 = imread(argv[3], CV_LOAD_IMAGE_UNCHANGED);       // 깊이 맵은 16비트 부호 없는 정수, 단채널 이미지
   Mat K = (Mat_<double>(3, 3) << 520.9, 0, 325.1, 0, 521.0, 249.7, 0, 0, 1);
   vector<Point3f> pts_3d;
   vector<Point2f> pts_2d;
@@ -79,9 +79,9 @@ int main(int argc, char **argv) {
 
   chrono::steady_clock::time_point t1 = chrono::steady_clock::now();
   Mat r, t;
-  solvePnP(pts_3d, pts_2d, K, Mat(), r, t, false); // 调用OpenCV 的 PnP 求解，可选择EPNP，DLS等方法
+  solvePnP(pts_3d, pts_2d, K, Mat(), r, t, false); // OpenCV PnP 풀이 호출 (EPNP, DLS 등 선택 가능)
   Mat R;
-  cv::Rodrigues(r, R); // r为旋转向量形式，用Rodrigues公式转换为矩阵
+  cv::Rodrigues(r, R); // r 은 회전 벡터 형식이므로 Rodrigues 공식으로 행렬로 변환
   chrono::steady_clock::time_point t2 = chrono::steady_clock::now();
   chrono::duration<double> time_used = chrono::duration_cast<chrono::duration<double>>(t2 - t1);
   cout << "solve pnp in opencv cost time: " << time_used.count() << " seconds." << endl;
@@ -118,7 +118,7 @@ void find_feature_matches(const Mat &img_1, const Mat &img_2,
                           std::vector<KeyPoint> &keypoints_1,
                           std::vector<KeyPoint> &keypoints_2,
                           std::vector<DMatch> &matches) {
-  //-- 初始化
+  //-- 초기화
   Mat descriptors_1, descriptors_2;
   // used in OpenCV3
   Ptr<FeatureDetector> detector = ORB::create();
@@ -127,23 +127,23 @@ void find_feature_matches(const Mat &img_1, const Mat &img_2,
   // Ptr<FeatureDetector> detector = FeatureDetector::create ( "ORB" );
   // Ptr<DescriptorExtractor> descriptor = DescriptorExtractor::create ( "ORB" );
   Ptr<DescriptorMatcher> matcher = DescriptorMatcher::create("BruteForce-Hamming");
-  //-- 第一步:检测 Oriented FAST 角点位置
+  //-- 1단계: Oriented FAST 코너점 위치를 검출합니다
   detector->detect(img_1, keypoints_1);
   detector->detect(img_2, keypoints_2);
 
-  //-- 第二步:根据角点位置计算 BRIEF 描述子
+  //-- 2단계: 코너점 위치를 기반으로 BRIEF 디스크립터를 계산합니다
   descriptor->compute(img_1, keypoints_1, descriptors_1);
   descriptor->compute(img_2, keypoints_2, descriptors_2);
 
-  //-- 第三步:对两幅图像中的BRIEF描述子进行匹配，使用 Hamming 距离
+  //-- 3단계: 두 이미지의 BRIEF 디스크립터를 Hamming 거리로 매칭합니다
   vector<DMatch> match;
   // BFMatcher matcher ( NORM_HAMMING );
   matcher->match(descriptors_1, descriptors_2, match);
 
-  //-- 第四步:匹配点对筛选
+  //-- 4단계: 매칭 쌍을 필터링합니다
   double min_dist = 10000, max_dist = 0;
 
-  //找出所有匹配之间的最小距离和最大距离, 即是最相似的和最不相似的两组点之间的距离
+  // 모든 매칭의 최소 거리와 최대 거리를 찾습니다 (가장 유사한 쌍과 가장 유사하지 않은 쌍의 거리)
   for (int i = 0; i < descriptors_1.rows; i++) {
     double dist = match[i].distance;
     if (dist < min_dist) min_dist = dist;
@@ -153,7 +153,7 @@ void find_feature_matches(const Mat &img_1, const Mat &img_2,
   printf("-- Max dist : %f \n", max_dist);
   printf("-- Min dist : %f \n", min_dist);
 
-  //当描述子之间的距离大于两倍的最小距离时,即认为匹配有误.但有时候最小距离会非常小,设置一个经验值30作为下限.
+  // 디스크립터 간 거리가 최솟값의 두 배보다 크면 잘못된 매칭으로 간주합니다. 최솟값이 매우 작을 경우를 대비해 경험적 하한값으로 30을 사용합니다.
   for (int i = 0; i < descriptors_1.rows; i++) {
     if (match[i].distance <= max(2 * min_dist, 30.0)) {
       matches.push_back(match[i]);
@@ -310,15 +310,15 @@ void bundleAdjustmentG2O(
   const Mat &K,
   Sophus::SE3d &pose) {
 
-  // 构建图优化，先设定g2o
+  // 그래프 최적화를 구성합니다. 먼저 g2o 를 설정합니다
   typedef g2o::BlockSolver<g2o::BlockSolverTraits<6, 3>> BlockSolverType;  // pose is 6, landmark is 3
-  typedef g2o::LinearSolverDense<BlockSolverType::PoseMatrixType> LinearSolverType; // 线性求解器类型
-  // 梯度下降方法，可以从GN, LM, DogLeg 中选
+  typedef g2o::LinearSolverDense<BlockSolverType::PoseMatrixType> LinearSolverType; // 선형 솔버 타입
+  // 경사 하강법 선택: GN, LM, DogLeg 중에서 선택 가능
   auto solver = new g2o::OptimizationAlgorithmGaussNewton(
     g2o::make_unique<BlockSolverType>(g2o::make_unique<LinearSolverType>()));
-  g2o::SparseOptimizer optimizer;     // 图模型
-  optimizer.setAlgorithm(solver);   // 设置求解器
-  optimizer.setVerbose(true);       // 打开调试输出
+  g2o::SparseOptimizer optimizer;     // 그래프 모델
+  optimizer.setAlgorithm(solver);   // 솔버 설정
+  optimizer.setVerbose(true);       // 디버그 출력 활성화
 
   // vertex
   VertexPose *vertex_pose = new VertexPose(); // camera vertex_pose

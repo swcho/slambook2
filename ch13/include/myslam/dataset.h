@@ -7,9 +7,9 @@
 namespace myslam {
 
 /**
- * 数据集读取
- * 构造时传入配置文件路径，配置文件的dataset_dir为数据集路径
- * Init之后可获得相机和下一帧图像
+ * 데이터셋 읽기
+ * 생성 시 설정 파일 경로를 전달합니다. 설정 파일의 dataset_dir 이 데이터셋 경로입니다
+ * Init 후에는 카메라와 다음 프레임 이미지를 가져올 수 있습니다
  */
 class Dataset {
    public:
@@ -17,7 +17,7 @@ class Dataset {
     typedef std::shared_ptr<Dataset> Ptr;
     Dataset(const std::string& dataset_path);
 
-    /// 初始化，返回是否成功
+    /// 초기화, 성공 여부를 반환합니다
     bool Init();
 
     /// create and return the next frame containing the stereo images
