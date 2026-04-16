@@ -15,9 +15,8 @@ struct CURVE_FITTING_COST {
 
   // 잔차 계산
   template<typename T>
-  bool operator()(
-    const T *const abc, // 모델 파라미터, 3차원
-    T *residual) const {
+  bool operator()(const T *const abc, // 모델 파라미터, 3차원
+                  T *residual) const {
     residual[0] = T(_y) - ceres::exp(abc[0] * T(_x) * T(_x) + abc[1] * T(_x) + abc[2]); // y-exp(ax^2+bx+c)
     return true;
   }
