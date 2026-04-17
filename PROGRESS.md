@@ -5,7 +5,7 @@
 
 - **시작일**: 2026-04-17
 - **최근 갱신**: 2026-04-17
-- **현재 진행 중**: — (미착수. 다음 세션은 **Phase A**부터 시작)
+- **현재 진행 중**: — (Phase A 완료. 다음 세션은 **Phase A+ — g2o/CXSparse WASM 스파이크**부터 시작)
 
 ---
 
@@ -13,17 +13,18 @@
 
 | 영역 | 상태 |
 |------|------|
-| 프로젝트 스캐폴딩 (`ch13-wasm/` 생성) | ⬜ 미착수 |
-| Emscripten 환경 | ⬜ 미설치 |
+| 프로젝트 스캐폴딩 (`ch13-wasm/` 생성) | ✅ 완료 |
+| Emscripten 환경 | ✅ Homebrew `emscripten 5.0.6` (아래 주의사항 참고) |
+| hello_world WASM E2E | ✅ 브라우저 경로(`greet`/`add`) Node 실행으로 수치 검증 완료 |
 | g2o WASM 스파이크 (Phase A+) | ⬜ 미수행 — **결정 전** |
-| 현재 브랜치 | `ex` (PLAN.md만 작성된 상태) |
-| 마지막 커밋 | — |
+| 현재 브랜치 | `ex` |
+| 마지막 커밋 | `<pending>` (Phase A 커밋 예정) |
 
 ---
 
 ## Phase 진척 체크박스
 
-- [ ] **Phase A** — 프로젝트 스캐폴딩 (Vite+React+TS, COEP/COOP, hello_world WASM E2E)
+- [x] **Phase A** — 프로젝트 스캐폴딩 (Vite+React+TS, COEP/COOP, hello_world WASM E2E) ← 2026-04-17 완료
 - [ ] **Phase A+** — g2o/CXSparse WASM 스파이크 ⚠️ 가장 중요 (Gate)
   - 결과: `pending` (성공 → 원안 진행 / 실패 → minimal LM 피벗)
 - [ ] **Phase B** — Step 1~2 Dataset + Camera
@@ -64,15 +65,19 @@
 | 날짜 | 결정 | 근거 | 영향 |
 |------|------|------|------|
 | 2026-04-17 | PLAN.md 초안 확정 | 초기 설계 | — |
+| 2026-04-17 | **Phase A 스캐폴드 채택**: Vite 5 + React 18 + TS 5 + react-router-dom v6 + Zustand 5 | PLAN §1.1/§2 원안 + Node 22 환경에서 동작 확인 | 이후 Phase에서 이 구성 위에 Step UI/WASM 바인딩을 쌓음 |
+| 2026-04-17 | **WASM 빌드 체인**: Homebrew `emscripten 5.0.6` + CMake + `--bind` + ES6 모듈(`EXPORT_ES6=1`) | PLAN §1.2, §7.2. Emscripten 5.x가 플래그 상위 호환 | `CH13_WASM_VARIANT`로 baseline/simd/mt/mt-simd 분기 |
+| 2026-04-17 | **Emscripten Python 우회**: `EMSDK_PYTHON`을 `python@3.14`로 고정 | Homebrew 래퍼가 `PYTHON` 변수를 쓰는데, 내부 `emcc` 스크립트는 `EMSDK_PYTHON`/`python3`를 우선 참조 → 시스템 Python 3.9로 떨어져 실패 | `wasm-src/build.sh`에서 자동 설정 |
 | _(미정)_ | g2o WASM 포팅 채택 여부 | Phase A+ 스파이크 결과 | Step 8·11 구현 경로 |
-| _(미정)_ | Sophus 버전 또는 C++17 업그레이드 | Phase A+ 빌드 검증 | 전체 컴파일 플래그 |
+| _(미정)_ | Sophus 버전 또는 C++17 업그레이드 | Phase A+ 빌드 검증 | 전체 컴파일 플래그 (Phase A의 hello_world는 C++17 기본 채택) |
 | _(미정)_ | OpenCV.js 커스텀 빌드 범위 | 번들 크기·기능 요구 | 초기 로드 크기 |
 
 ---
 
 ## 현재 블로커 / 오픈 이슈
 
-_(없음 — 시작 전)_
+- **Homebrew `emcc` 래퍼의 `PYTHON` vs `EMSDK_PYTHON` 불일치**: `/opt/homebrew/bin/emcc`가 설정하는 `PYTHON` 변수는 실제 `emcc` 스크립트에 전달되지 않아 시스템 Python 3.9로 폴백되어 실패한다. `wasm-src/build.sh`에서 `EMSDK_PYTHON`을 직접 설정해 우회. 문제 발생 시 `brew reinstall emscripten` 또는 공식 `emsdk` 사용 검토.
+- **번들 배포 타깃**: COEP/COOP 헤더가 필요한 MT variant는 GitHub Pages에 직접 배포 불가 — PLAN §11 대로 Cloudflare Pages / Vercel / Netlify 중 선택 필요. (Phase I 착수 시 확정)
 
 ---
 
@@ -81,8 +86,26 @@ _(없음 — 시작 전)_
 - 계획서: `PLAN.md`
 - 원본 분석: `docs/analysis/2026-04-17-ch13-full-analysis.md`
 - 원본 C++ 코드: `ch13/`
-- (예정) WASM 프로젝트 루트: `ch13-wasm/`
+- WASM 프로젝트 루트: `ch13-wasm/` ✅
+  - React/TS 앱: `ch13-wasm/src/` (router, App shell, Home, StepLayout, ParamPanel, PerfMeter, VerifyGate, Zustand stores)
+  - WASM 소스: `ch13-wasm/wasm-src/myslam/bindings/bind_hello.cpp` (+ `CMakeLists.txt`, `build.sh`)
+  - 빌드 산출물: `ch13-wasm/public/wasm/myslam_hello.baseline.{js,wasm}` (Phase A 검증용)
 - (예정) 단계별 학습 노트: `docs/steps/NN-*.md`
+
+---
+
+## Phase A 완료 체크리스트
+
+- [x] `ch13-wasm/` 디렉토리 + Vite+React+TS 스캐폴드 (`package.json`, `tsconfig.json`, `vite.config.ts`, `index.html`)
+- [x] `vite.config.ts`에서 `dev`·`preview` 헤더 모두 `COOP=same-origin` / `COEP=require-corp`
+- [x] `curl -I http://127.0.0.1:5174/`로 헤더 반영 확인
+- [x] `curl -I /wasm/myslam_hello.baseline.wasm`로 헤더 반영 확인
+- [x] react-router-dom v6: 13개 Step 라우트 + `/` Home 라우트
+- [x] Zustand stores: `pipelineStore`(persist with localStorage) / `paramStore` / `benchStore`
+- [x] 공통 컴포넌트 skeleton: `StepLayout`, `ParamPanel`, `PerfMeter`, `VerifyGate`
+- [x] Emscripten + CMake + `bind_hello.cpp` + `build.sh` — baseline 빌드 성공
+- [x] `loadHelloWasm()` 경유 TS 타입, Node에서 `greet("node") → "hello from wasm, node!"`, `add(2,3)=5` 확인
+- [x] `npx tsc -b` 에러 0건, `vite build` gzip 72KB (PLAN §10 목표 400KB 이하)
 
 ---
 

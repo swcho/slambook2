@@ -1,0 +1,24 @@
+node_modules/
+dist/
+.vite/
+*.log
+
+# WASM build outputs (built artifacts land in public/wasm via build.sh)
+public/wasm/*.wasm
+public/wasm/*.js
+public/wasm/*.data
+public/wasm/*.mem
+wasm-src/build/
+
+# Re-include: the repo-root .gitignore has a broad `**build**` glob that
+# otherwise swallows build.sh. (wasm-src/build/ above still ignores the dir.)
+!wasm-src/build.sh
+
+
+# emsdk / third-party (if vendored later)
+wasm-src/third_party/emsdk/
+wasm-src/third_party/eigen/
+wasm-src/third_party/sophus/
+wasm-src/third_party/opencv-minimal/
+wasm-src/third_party/g2o/
+wasm-src/third_party/cxsparse/
