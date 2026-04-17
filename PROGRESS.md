@@ -15,7 +15,7 @@
 |------|------|
 | 프로젝트 스캐폴딩 (`ch13-wasm/` 생성) | ✅ 완료 |
 | Emscripten 환경 | ✅ Homebrew `emscripten 5.0.6` (아래 주의사항 참고) |
-| hello_world WASM E2E | ✅ 브라우저 경로(`greet`/`add`) Node 실행으로 수치 검증 완료 |
+| hello_world WASM E2E | 🟡 Node 스모크 검증(`greet`/`add` 수치 일치) — 실제 브라우저 경로(streaming fetch + `locateFile`)는 Phase A+ 세션 시작 시 직접 관측 필요 |
 | g2o WASM 스파이크 (Phase A+) | ⬜ 미수행 — **결정 전** |
 | 현재 브랜치 | `ex` |
 | 마지막 커밋 | `<pending>` (Phase A 커밋 예정) |
@@ -76,6 +76,7 @@
 
 ## 현재 블로커 / 오픈 이슈
 
+- **브라우저 실시간 관측 미수행**: Phase A 작업은 헤드리스 환경에서 진행되어 실제 Chrome/Safari에서 React 앱 + WASM 동적 import + `locateFile` 경로를 눈으로 확인하지 못했다. Phase A+ 세션 시작 시 `npm run dev` 후 `http://127.0.0.1:5173/`를 먼저 열어 Home의 greeting 문자열과 13개 Step 라우트 전환을 관찰할 것. 문제 발견 시 A+ 작업 전에 수정.
 - **Homebrew `emcc` 래퍼의 `PYTHON` vs `EMSDK_PYTHON` 불일치**: `/opt/homebrew/bin/emcc`가 설정하는 `PYTHON` 변수는 실제 `emcc` 스크립트에 전달되지 않아 시스템 Python 3.9로 폴백되어 실패한다. `wasm-src/build.sh`에서 `EMSDK_PYTHON`을 직접 설정해 우회. 문제 발생 시 `brew reinstall emscripten` 또는 공식 `emsdk` 사용 검토.
 - **번들 배포 타깃**: COEP/COOP 헤더가 필요한 MT variant는 GitHub Pages에 직접 배포 불가 — PLAN §11 대로 Cloudflare Pages / Vercel / Netlify 중 선택 필요. (Phase I 착수 시 확정)
 
@@ -104,8 +105,9 @@
 - [x] Zustand stores: `pipelineStore`(persist with localStorage) / `paramStore` / `benchStore`
 - [x] 공통 컴포넌트 skeleton: `StepLayout`, `ParamPanel`, `PerfMeter`, `VerifyGate`
 - [x] Emscripten + CMake + `bind_hello.cpp` + `build.sh` — baseline 빌드 성공
-- [x] `loadHelloWasm()` 경유 TS 타입, Node에서 `greet("node") → "hello from wasm, node!"`, `add(2,3)=5` 확인
+- [x] `loadHelloWasm()` 경유 TS 타입, Node에서 `greet("node") → "hello from wasm, node!"`, `add(2,3)=5` 확인 — Node는 `wasmBinary` 주입 경로였음(브라우저의 streaming fetch + `locateFile` 경로와 다름)
 - [x] `npx tsc -b` 에러 0건, `vite build` gzip 72KB (PLAN §10 목표 400KB 이하)
+- [ ] **남은 관측**: 실제 브라우저(Chrome/Edge 121+)에서 `/` Home 페이지가 `greet("ch13-wasm")`의 결과 문자열을 화면에 출력하는지, `/step/dataset` 등 13개 라우트가 404 없이 전환되는지를 Phase A+ 세션 시작 시 먼저 수동 확인할 것
 
 ---
 
