@@ -2,7 +2,11 @@
   "permissions": {
     "allow": [
       "Bash(wc -l /Users/swcho/projects/swcho/slambook2/ch7/*.cpp)",
-      "Bash(ls /Users/swcho/projects/swcho/slambook2/*.md)"
+      "Bash(ls /Users/swcho/projects/swcho/slambook2/*.md)",
+      "Bash(git *)",
+      "Bash(file /Users/swcho/projects/swcho/slambook2/ch11/data/*.png)",
+      "Bash(wc -l /Users/swcho/projects/swcho/slambook2/ch11/*.cpp)",
+      "Bash(grep -E \"\\\\.\\(cpp|h|hpp\\)$\")"
     ]
   }
 }
