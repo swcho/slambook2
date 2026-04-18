@@ -69,32 +69,37 @@ if(CH13_WASM_TARGET STREQUAL "pnp_spike" OR CH13_WASM_TARGET STREQUAL "ba_spike"
   # from the book's pinned 3rdparty/g2o (2018) to stay compatible with a
   # modern Eigen + CMake.
   set(G2O_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/third_party/g2o")
+  set(EIGEN_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/third_party/eigen")
 
-  # Eigen: header-only, but modern g2o uses find_package(Eigen3 NO_MODULE)
-  # which needs Eigen3Config.cmake. Point at the Homebrew cellar cmake dir.
-  if(NOT DEFINED Eigen3_DIR)
-    foreach(_candidate
-        /opt/homebrew/share/eigen3/cmake
-        /opt/homebrew/opt/eigen/share/eigen3/cmake
-        /usr/local/share/eigen3/cmake)
-      if(EXISTS "${_candidate}/Eigen3Config.cmake")
-        set(Eigen3_DIR "${_candidate}" CACHE PATH "" FORCE)
-        break()
-      endif()
-    endforeach()
-    # Fallback: glob the cellar for any Eigen version.
-    if(NOT Eigen3_DIR)
-      file(GLOB _eigen_cellar_cmake "/opt/homebrew/Cellar/eigen/*/share/eigen3/cmake")
-      if(_eigen_cellar_cmake)
-        list(GET _eigen_cellar_cmake 0 Eigen3_DIR)
-        set(Eigen3_DIR "${Eigen3_DIR}" CACHE PATH "" FORCE)
-      endif()
-    endif()
+  # Eigen: vendored as a submodule under third_party/eigen (pinned tag 5.0.1).
+  # Using add_subdirectory gives us a fully portable build that does not
+  # depend on the host having Homebrew / apt Eigen installed. Modern g2o
+  # calls find_package(Eigen3 REQUIRED NO_MODULE) at its top-level CMake,
+  # so we enable EIGEN_BUILD_CMAKE_PACKAGE=ON to make Eigen generate an
+  # Eigen3Config.cmake into its build dir and then point Eigen3_DIR at it.
+  if(NOT EXISTS "${EIGEN_ROOT}/CMakeLists.txt")
+    message(FATAL_ERROR
+      "Eigen submodule not initialized at ${EIGEN_ROOT}. "
+      "Run: git submodule update --init --recursive")
   endif()
-  if(NOT Eigen3_DIR)
-    message(FATAL_ERROR "Eigen3_DIR not set — install via 'brew install eigen' or set Eigen3_DIR manually")
-  endif()
-  message(STATUS "[ch13-wasm] Eigen3_DIR=${Eigen3_DIR}")
+
+  # Quiet Eigen's top-level auxiliaries — we only want the header-only target.
+  set(EIGEN_BUILD_CMAKE_PACKAGE ON  CACHE BOOL "" FORCE)
+  set(EIGEN_BUILD_DOC           OFF CACHE BOOL "" FORCE)
+  set(EIGEN_BUILD_DEMOS         OFF CACHE BOOL "" FORCE)
+  set(EIGEN_BUILD_TESTING       OFF CACHE BOOL "" FORCE)
+  set(EIGEN_BUILD_BLAS          OFF CACHE BOOL "" FORCE)
+  set(EIGEN_BUILD_LAPACK        OFF CACHE BOOL "" FORCE)
+  set(EIGEN_BUILD_BTL           OFF CACHE BOOL "" FORCE)
+  set(EIGEN_BUILD_SPBENCH       OFF CACHE BOOL "" FORCE)
+  set(EIGEN_BUILD_PKGCONFIG     OFF CACHE BOOL "" FORCE)
+  set(BUILD_TESTING             OFF CACHE BOOL "" FORCE)
+  # Keep Eigen from polluting the user's ~/.cmake/packages registry.
+  set(CMAKE_EXPORT_NO_PACKAGE_REGISTRY ON)
+
+  add_subdirectory("${EIGEN_ROOT}" "${CMAKE_CURRENT_BINARY_DIR}/eigen_build" EXCLUDE_FROM_ALL)
+  set(Eigen3_DIR "${CMAKE_CURRENT_BINARY_DIR}/eigen_build" CACHE PATH "" FORCE)
+  message(STATUS "[ch13-wasm] Eigen3_DIR=${Eigen3_DIR} (vendored submodule)")
 
   # g2o: disable everything we don't need for the spike.
   set(G2O_USE_OPENGL OFF CACHE BOOL "" FORCE)
@@ -130,7 +135,7 @@ if(CH13_WASM_TARGET STREQUAL "pnp_spike" OR CH13_WASM_TARGET STREQUAL "ba_spike"
 
   add_subdirectory("${G2O_ROOT}" "${CMAKE_CURRENT_BINARY_DIR}/g2o_build" EXCLUDE_FROM_ALL)
 
-  # g2o's CMakeLists pins CMAKE_CXX_STANDARD 11, but Homebrew Eigen 3.4 uses
+  # g2o's CMakeLists pins CMAKE_CXX_STANDARD 11, but Eigen (3.4+/5.x) uses
   # std::enable_if_t (C++14). Override per target to match our C++17 baseline.
   foreach(_tgt core stuff solver_dense solver_eigen types_slam3d types_sba opengl_helper ext_csparse)
     if(TARGET ${_tgt})

@@ -5,7 +5,7 @@
 
 - **시작일**: 2026-04-17
 - **최근 갱신**: 2026-04-18
-- **현재 진행 중**: — (Phase A+ **GATE ✅**. 다음 세션은 **Phase B — Dataset + Camera** 착수)
+- **현재 진행 중**: — (Phase A+ **GATE ✅**. Eigen 벤더링 완료로 이식성 확보. 다음 세션은 **Phase B — Dataset + Camera** 착수)
 
 ---
 
@@ -75,6 +75,7 @@
 | 2026-04-18 | **BA 선형 솔버**: CXSparse 대신 `g2o/solvers/eigen`(`SimplicialLLT<SparseMatrix>`) 채택 | CXSparse 자체의 Emscripten 빌드까지 검증하려면 외부 SuiteSparse 벤더링이 추가로 필요 → 본 스파이크 시간 예산을 초과. gate의 본질 질문("g2o 기반 sparse BA가 WASM에서 동작하는가")은 solver_eigen으로 이미 답변됨 | Phase G 착수 시 solver_eigen으로 시작. 성능 부족 시에만 CXSparse 재평가 |
 | 2026-04-18 | **g2o CMake 통합 플래그셋 확정**(WASM 빌드용) | `DO_SSE_AUTODETECT=OFF + DISABLE_SSE2/3/4_1/4_2/4_A=ON` 없으면 macOS에서도 `-msseN` 플래그가 남아 emcc 거부; `G2O_USE_CHOLMOD/CSPARSE/OPENGL/OPENMP/LOGGING/LGPL_LIBS=OFF` 로 외부 의존성 차단; `cxx_std_17`을 core/stuff/solver_* 타깃에 강제; `-fexceptions` + `-sDISABLE_EXCEPTION_CATCHING=0` | Phase G에서 그대로 재사용 (`wasm-src/CMakeLists.txt` 참조) |
 | 2026-04-18 | **Sophus는 스파이크에 불필요**: SE(3) 정점은 `Eigen::Isometry3d`와 `Eigen::AngleAxisd` 기반으로 직접 구현 | Sophus 최신판 C++17 호환성 이슈 선행 검증 불필요했음 (BA·PnP 모두 성공) | Phase B+에서 myslam 본체를 이식할 때 Sophus 선택 여부를 재판단. 대안: 계속 Isometry3d로 통일 |
+| 2026-04-18 | **Eigen 벤더링**: Homebrew 의존을 제거하고 `ch13-wasm/wasm-src/third_party/eigen/`에 submodule(tag **5.0.1**) 추가, `CMakeLists.txt`에서 `add_subdirectory(third_party/eigen) + EIGEN_BUILD_CMAKE_PACKAGE=ON + Eigen3_DIR → 빌드 트리` 패턴으로 g2o의 `find_package(Eigen3 NO_MODULE)` 충족 | 이식성(Linux CI / 새 맥 환경)과 재현성(버전 핀) 확보. PLAN.md §2 디렉터리 구조의 원안과 일치. g2o submodule과 동일한 패턴이라 유지보수 일관성 | 동일 수치로 PnP/BA gate 재통과(`verify_pnp.mjs`, `verify_ba.mjs`). 이후 Sophus/OpenCV-minimal/CXSparse 벤더링 시에도 동일 패턴 사용. `export(PACKAGE Eigen3)` 부작용은 `CMAKE_EXPORT_NO_PACKAGE_REGISTRY=ON`으로 차단 |
 | _(미정)_ | OpenCV.js 커스텀 빌드 범위 | 번들 크기·기능 요구 | 초기 로드 크기 |
 
 ---
@@ -100,6 +101,7 @@
   - Phase A+ 스파이크: `ch13-wasm/wasm-src/spike/{bind_pnp_spike.cpp, bind_ba_spike.cpp, verify_pnp.mjs, verify_ba.mjs, verify_pnp_diag*.mjs}`
   - 빌드 스크립트: `ch13-wasm/wasm-src/{CMakeLists.txt, build.sh}` — `bash build.sh [baseline|simd|mt|mt-simd] [hello|pnp_spike|ba_spike]`
   - g2o submodule (modern master): `ch13-wasm/wasm-src/third_party/g2o/`
+  - Eigen submodule (tag 5.0.1): `ch13-wasm/wasm-src/third_party/eigen/`
   - 빌드 산출물: `ch13-wasm/public/wasm/myslam_{hello,pnp_spike,ba_spike}.<variant>.{js,wasm}`
 - (예정) 단계별 학습 노트: `docs/steps/NN-*.md`
 

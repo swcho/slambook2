@@ -17,8 +17,7 @@ wasm-src/build/
 
 # emsdk / third-party (if vendored later as plain copies, not submodules)
 wasm-src/third_party/emsdk/
-wasm-src/third_party/eigen/
 wasm-src/third_party/sophus/
 wasm-src/third_party/opencv-minimal/
 wasm-src/third_party/cxsparse/
-# g2o lives here as a git submodule (see .gitmodules) — explicitly tracked.
+# g2o and eigen live here as git submodules (see .gitmodules) — explicitly tracked.

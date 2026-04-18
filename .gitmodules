@@ -19,3 +19,6 @@
 [submodule "ch13-wasm/wasm-src/third_party/g2o"]
 	path = ch13-wasm/wasm-src/third_party/g2o
 	url = https://github.com/RainerKuemmerle/g2o.git
+[submodule "ch13-wasm/wasm-src/third_party/eigen"]
+	path = ch13-wasm/wasm-src/third_party/eigen
+	url = https://gitlab.com/libeigen/eigen.git
