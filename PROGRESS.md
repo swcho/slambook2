@@ -4,8 +4,8 @@
 각 Phase/Step 종료 시 이 파일을 반드시 갱신하고 커밋해야 새 세션이 상태를 복원할 수 있다.
 
 - **시작일**: 2026-04-17
-- **최근 갱신**: 2026-04-17
-- **현재 진행 중**: — (Phase A 완료. 다음 세션은 **Phase A+ — g2o/CXSparse WASM 스파이크**부터 시작)
+- **최근 갱신**: 2026-04-18
+- **현재 진행 중**: — (Phase A 헤드리스 검증 완료. **DOM 수동 관측만 사용자 대기**, 이후 세션은 **Phase A+ — g2o/CXSparse WASM 스파이크**부터 시작)
 
 ---
 
@@ -15,10 +15,11 @@
 |------|------|
 | 프로젝트 스캐폴딩 (`ch13-wasm/` 생성) | ✅ 완료 |
 | Emscripten 환경 | ✅ Homebrew `emscripten 5.0.6` (아래 주의사항 참고) |
-| hello_world WASM E2E | 🟡 Node 스모크 검증(`greet`/`add` 수치 일치) — 실제 브라우저 경로(streaming fetch + `locateFile`)는 Phase A+ 세션 시작 시 직접 관측 필요 |
+| hello_world WASM E2E | 🟡 Node 스모크 검증(`greet`/`add` 수치 일치) + `npm run dev` 헤드리스 검증(헤더·MIME·SPA fallback) 완료 — 브라우저 내 DOM 렌더링은 사용자 육안 확인 대기 |
+| dev 서버 헤드리스 검증 | ✅ 2026-04-18 완료 (아래 "Phase A 검증 기록" 참조) |
 | g2o WASM 스파이크 (Phase A+) | ⬜ 미수행 — **결정 전** |
 | 현재 브랜치 | `ex` |
-| 마지막 커밋 | `<pending>` (Phase A 커밋 예정) |
+| 마지막 커밋 | `890a11c` (fix: rerendering error) → 본 PROGRESS 갱신 커밋 예정 |
 
 ---
 
@@ -76,7 +77,7 @@
 
 ## 현재 블로커 / 오픈 이슈
 
-- **브라우저 실시간 관측 미수행**: Phase A 작업은 헤드리스 환경에서 진행되어 실제 Chrome/Safari에서 React 앱 + WASM 동적 import + `locateFile` 경로를 눈으로 확인하지 못했다. Phase A+ 세션 시작 시 `npm run dev` 후 `http://127.0.0.1:5173/`를 먼저 열어 Home의 greeting 문자열과 13개 Step 라우트 전환을 관찰할 것. 문제 발견 시 A+ 작업 전에 수정.
+- **브라우저 육안 관측 남음(비블로커)**: HTTP 계층은 2026-04-18 헤드리스로 검증됨(위 표 참조). 다만 React 마운트 + WASM streaming fetch + `locateFile` 해석은 브라우저 JS 엔진에서만 재현 가능 — Phase A+ 세션 시작 시 `npm run dev` 후 `http://127.0.0.1:5173/`를 열어 Home "WASM hello_world" 필드가 실제로 `hello from wasm, ch13-wasm!`으로 채워지는지 먼저 확인. 실패 시 A+ 진입 전에 수정.
 - **Homebrew `emcc` 래퍼의 `PYTHON` vs `EMSDK_PYTHON` 불일치**: `/opt/homebrew/bin/emcc`가 설정하는 `PYTHON` 변수는 실제 `emcc` 스크립트에 전달되지 않아 시스템 Python 3.9로 폴백되어 실패한다. `wasm-src/build.sh`에서 `EMSDK_PYTHON`을 직접 설정해 우회. 문제 발생 시 `brew reinstall emscripten` 또는 공식 `emsdk` 사용 검토.
 - **번들 배포 타깃**: COEP/COOP 헤더가 필요한 MT variant는 GitHub Pages에 직접 배포 불가 — PLAN §11 대로 Cloudflare Pages / Vercel / Netlify 중 선택 필요. (Phase I 착수 시 확정)
 
@@ -107,7 +108,20 @@
 - [x] Emscripten + CMake + `bind_hello.cpp` + `build.sh` — baseline 빌드 성공
 - [x] `loadHelloWasm()` 경유 TS 타입, Node에서 `greet("node") → "hello from wasm, node!"`, `add(2,3)=5` 확인 — Node는 `wasmBinary` 주입 경로였음(브라우저의 streaming fetch + `locateFile` 경로와 다름)
 - [x] `npx tsc -b` 에러 0건, `vite build` gzip 72KB (PLAN §10 목표 400KB 이하)
-- [ ] **남은 관측**: 실제 브라우저(Chrome/Edge 121+)에서 `/` Home 페이지가 `greet("ch13-wasm")`의 결과 문자열을 화면에 출력하는지, `/step/dataset` 등 13개 라우트가 404 없이 전환되는지를 Phase A+ 세션 시작 시 먼저 수동 확인할 것
+- [x] **헤드리스 검증(2026-04-18)**: `npm run dev`로 Vite 띄운 뒤 `curl`로 HTTP 계층 확인 — `/`와 `/wasm/myslam_hello.baseline.{js,wasm}` 모두 `COOP=same-origin`·`COEP=require-corp` 헤더 반영, `.wasm`은 `application/wasm` MIME로 서빙됨, SPA fallback으로 13개 `/step/<slug>`와 `/step/nonexistent`까지 `200 text/html`로 index.html 반환 확인
+- [ ] **사용자 육안 관측(남음)**: `npm run dev` 후 Chrome/Edge 121+에서 `http://127.0.0.1:5173/`를 열어 ① Home의 "WASM hello_world" 항목이 `hello from wasm, ch13-wasm!` 문자열로 바뀌는지(= React 마운트 + WASM streaming fetch + `locateFile` 성공), ② 사이드바 13개 Step 링크가 흰/회색 경계 없이 전환되는지 확인. 헤드리스로는 브라우저 JS 엔진 경로를 재현할 수 없어 사용자 대기로 남겨 둔다
+
+### Phase A 검증 기록 (2026-04-18, 헤드리스)
+
+| 항목 | 관측값 |
+|------|--------|
+| `GET /` | `200 text/html`, `COOP=same-origin`, `COEP=require-corp` |
+| `GET /wasm/myslam_hello.baseline.wasm` | `200 application/wasm` (13675 B), COEP/COOP 동일 반영 |
+| `GET /wasm/myslam_hello.baseline.js` | `200 text/javascript`, COEP/COOP 동일 반영 |
+| `GET /step/<slug>` × 13 (dataset~full-pipeline) | 모두 `200 text/html` — SPA fallback 정상 |
+| `GET /step/nonexistent` | `200 text/html` (router의 `path: '*'` → Navigate `/`로 클라이언트 리다이렉트될 것으로 기대) |
+| `GET /src/main.tsx`, `/src/wasm/loader.ts` | `200 text/javascript` — Vite 모듈 그래프 정상 |
+| `index.html` 내용 | `<div id="root">` + `/src/main.tsx` 모듈 로드 태그 포함 |
 
 ---
 
