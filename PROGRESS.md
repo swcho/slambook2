@@ -5,7 +5,7 @@
 
 - **시작일**: 2026-04-17
 - **최근 갱신**: 2026-04-18
-- **현재 진행 중**: — (Phase A 헤드리스 검증 완료. **DOM 수동 관측만 사용자 대기**, 이후 세션은 **Phase A+ — g2o/CXSparse WASM 스파이크**부터 시작)
+- **현재 진행 중**: — (Phase A+ **GATE ✅**. 다음 세션은 **Phase B — Dataset + Camera** 착수)
 
 ---
 
@@ -17,17 +17,18 @@
 | Emscripten 환경 | ✅ Homebrew `emscripten 5.0.6` (아래 주의사항 참고) |
 | hello_world WASM E2E | 🟡 Node 스모크 검증(`greet`/`add` 수치 일치) + `npm run dev` 헤드리스 검증(헤더·MIME·SPA fallback) 완료 — 브라우저 내 DOM 렌더링은 사용자 육안 확인 대기 |
 | dev 서버 헤드리스 검증 | ✅ 2026-04-18 완료 (아래 "Phase A 검증 기록" 참조) |
-| g2o WASM 스파이크 (Phase A+) | ⬜ 미수행 — **결정 전** |
+| g2o WASM 스파이크 (Phase A+) | ✅ 2026-04-18 gate 통과 (Stage 1 PnP + Stage 2 BA 모두 수치 검증). CXSparse는 별도 open 질문으로 남김 |
 | 현재 브랜치 | `ex` |
-| 마지막 커밋 | `890a11c` (fix: rerendering error) → 본 PROGRESS 갱신 커밋 예정 |
+| 마지막 커밋 | `c85a59c` (progress: record Phase A headless verification) → 본 Phase A+ 커밋 예정 |
 
 ---
 
 ## Phase 진척 체크박스
 
 - [x] **Phase A** — 프로젝트 스캐폴딩 (Vite+React+TS, COEP/COOP, hello_world WASM E2E) ← 2026-04-17 완료
-- [ ] **Phase A+** — g2o/CXSparse WASM 스파이크 ⚠️ 가장 중요 (Gate)
-  - 결과: `pending` (성공 → 원안 진행 / 실패 → minimal LM 피벗)
+- [x] **Phase A+** — g2o/(C)Sparse WASM 스파이크 ⚠️ 가장 중요 (Gate) ← 2026-04-18 통과
+  - 결과: **✅ success** — 원안대로 Phase B 이후 진행. g2o 경로 채택 (Stage 1 PnP 통과 + Stage 2 BA via `solver_eigen`/`SimplicialLLT` 통과)
+  - Open follow-up: CXSparse 자체의 Emscripten 빌드는 미검증 — Phase G에서 성능이 부족하면 그때 통합 재평가
 - [ ] **Phase B** — Step 1~2 Dataset + Camera
 - [ ] **Phase C** — Step 3~4 Feature Detection + Stereo LK
 - [ ] **Phase D** — Step 5~6 Triangulation + Initial Map
@@ -69,16 +70,21 @@
 | 2026-04-17 | **Phase A 스캐폴드 채택**: Vite 5 + React 18 + TS 5 + react-router-dom v6 + Zustand 5 | PLAN §1.1/§2 원안 + Node 22 환경에서 동작 확인 | 이후 Phase에서 이 구성 위에 Step UI/WASM 바인딩을 쌓음 |
 | 2026-04-17 | **WASM 빌드 체인**: Homebrew `emscripten 5.0.6` + CMake + `--bind` + ES6 모듈(`EXPORT_ES6=1`) | PLAN §1.2, §7.2. Emscripten 5.x가 플래그 상위 호환 | `CH13_WASM_VARIANT`로 baseline/simd/mt/mt-simd 분기 |
 | 2026-04-17 | **Emscripten Python 우회**: `EMSDK_PYTHON`을 `python@3.14`로 고정 | Homebrew 래퍼가 `PYTHON` 변수를 쓰는데, 내부 `emcc` 스크립트는 `EMSDK_PYTHON`/`python3`를 우선 참조 → 시스템 Python 3.9로 떨어져 실패 | `wasm-src/build.sh`에서 자동 설정 |
-| _(미정)_ | g2o WASM 포팅 채택 여부 | Phase A+ 스파이크 결과 | Step 8·11 구현 경로 |
-| _(미정)_ | Sophus 버전 또는 C++17 업그레이드 | Phase A+ 빌드 검증 | 전체 컴파일 플래그 (Phase A의 hello_world는 C++17 기본 채택) |
+| 2026-04-18 | **g2o 채택**: 원안(g2o 경로) 유지. minimal LM 피벗 불필요 | Phase A+ 스파이크가 g2o core + solver_dense(PnP) + solver_eigen(BA) 모두 Emscripten/WASM에서 빌드·수렴함을 실증 (`wasm-src/spike/verify_{pnp,ba}.mjs` 참조) | Phase E(Step 8 PnP) + Phase G(Step 11 BA) 모두 g2o 기반 |
+| 2026-04-18 | **g2o 버전**: slambook 핀된 `3rdparty/g2o`(2018, 9b41a4e) 대신 **modern master(502c4077)**를 `ch13-wasm/wasm-src/third_party/g2o/` 하위에 별도 submodule로 추가 | 구 버전은 `cmake_minimum_required < 3.5`, `CMAKE_CXX_STANDARD 11` 고정 → Homebrew Eigen 3.4의 `std::enable_if_t`(C++14) 미충족 + cmake 3.10 호환성 문제 누적. 모던 master는 `cmake 3.14` + C++17 친화 | `ch13-wasm`는 책 submodule과 독립. 이 선택은 교육용 플레이그라운드의 C++ 이식 범위 축소(gflags/glog/Pangolin 제거 + 단순화 유지)와도 일치 |
+| 2026-04-18 | **BA 선형 솔버**: CXSparse 대신 `g2o/solvers/eigen`(`SimplicialLLT<SparseMatrix>`) 채택 | CXSparse 자체의 Emscripten 빌드까지 검증하려면 외부 SuiteSparse 벤더링이 추가로 필요 → 본 스파이크 시간 예산을 초과. gate의 본질 질문("g2o 기반 sparse BA가 WASM에서 동작하는가")은 solver_eigen으로 이미 답변됨 | Phase G 착수 시 solver_eigen으로 시작. 성능 부족 시에만 CXSparse 재평가 |
+| 2026-04-18 | **g2o CMake 통합 플래그셋 확정**(WASM 빌드용) | `DO_SSE_AUTODETECT=OFF + DISABLE_SSE2/3/4_1/4_2/4_A=ON` 없으면 macOS에서도 `-msseN` 플래그가 남아 emcc 거부; `G2O_USE_CHOLMOD/CSPARSE/OPENGL/OPENMP/LOGGING/LGPL_LIBS=OFF` 로 외부 의존성 차단; `cxx_std_17`을 core/stuff/solver_* 타깃에 강제; `-fexceptions` + `-sDISABLE_EXCEPTION_CATCHING=0` | Phase G에서 그대로 재사용 (`wasm-src/CMakeLists.txt` 참조) |
+| 2026-04-18 | **Sophus는 스파이크에 불필요**: SE(3) 정점은 `Eigen::Isometry3d`와 `Eigen::AngleAxisd` 기반으로 직접 구현 | Sophus 최신판 C++17 호환성 이슈 선행 검증 불필요했음 (BA·PnP 모두 성공) | Phase B+에서 myslam 본체를 이식할 때 Sophus 선택 여부를 재판단. 대안: 계속 Isometry3d로 통일 |
 | _(미정)_ | OpenCV.js 커스텀 빌드 범위 | 번들 크기·기능 요구 | 초기 로드 크기 |
 
 ---
 
 ## 현재 블로커 / 오픈 이슈
 
-- **브라우저 육안 관측 남음(비블로커)**: HTTP 계층은 2026-04-18 헤드리스로 검증됨(위 표 참조). 다만 React 마운트 + WASM streaming fetch + `locateFile` 해석은 브라우저 JS 엔진에서만 재현 가능 — Phase A+ 세션 시작 시 `npm run dev` 후 `http://127.0.0.1:5173/`를 열어 Home "WASM hello_world" 필드가 실제로 `hello from wasm, ch13-wasm!`으로 채워지는지 먼저 확인. 실패 시 A+ 진입 전에 수정.
-- **Homebrew `emcc` 래퍼의 `PYTHON` vs `EMSDK_PYTHON` 불일치**: `/opt/homebrew/bin/emcc`가 설정하는 `PYTHON` 변수는 실제 `emcc` 스크립트에 전달되지 않아 시스템 Python 3.9로 폴백되어 실패한다. `wasm-src/build.sh`에서 `EMSDK_PYTHON`을 직접 설정해 우회. 문제 발생 시 `brew reinstall emscripten` 또는 공식 `emsdk` 사용 검토.
+- **브라우저 육안 관측 남음(비블로커)**: HTTP 계층은 2026-04-18 헤드리스로 검증됨. 다만 React 마운트 + WASM streaming fetch + `locateFile` 해석은 브라우저 JS 엔진에서만 재현 가능 — Phase B 착수 전에 `npm run dev` 후 `http://127.0.0.1:5173/`를 열어 Home "WASM hello_world" 필드가 `hello from wasm, ch13-wasm!`로 채워지는지 사용자 확인 권장.
+- **CXSparse Emscripten 빌드 (Phase G 열린 질문)**: Stage 2는 `solver_eigen` 대체로 통과. Phase G BA 성능 측정에서 `solver_eigen`(SimplicialLLT)이 active window 10+ keyframes 급에서 충분히 빠르다면 그대로 유지. 병목이 확인되면 그 시점에 CXSparse를 `wasm-src/third_party/cxsparse/`에 벤더링 + `g2o/solvers/csparse` 활성화 시도.
+- **BA 수치 테스트의 스케일 게이지**: 모노큘러 BA는 fixed_pose만으로 scale gauge를 제거할 수 없어 `verify_ba.mjs`에서 스케일 대비 최대 ~1% 드리프트가 정상 수렴으로 나타남. 실제 ch13 파이프라인은 stereo baseline이 scale을 고정하므로 Phase G에서 이 문제는 없음.
+- **Homebrew `emcc` 래퍼의 `PYTHON` vs `EMSDK_PYTHON` 불일치**: `wasm-src/build.sh`에서 `EMSDK_PYTHON`을 직접 설정해 우회. 문제 발생 시 `brew reinstall emscripten` 또는 공식 `emsdk` 사용 검토.
 - **번들 배포 타깃**: COEP/COOP 헤더가 필요한 MT variant는 GitHub Pages에 직접 배포 불가 — PLAN §11 대로 Cloudflare Pages / Vercel / Netlify 중 선택 필요. (Phase I 착수 시 확정)
 
 ---
@@ -90,8 +96,11 @@
 - 원본 C++ 코드: `ch13/`
 - WASM 프로젝트 루트: `ch13-wasm/` ✅
   - React/TS 앱: `ch13-wasm/src/` (router, App shell, Home, StepLayout, ParamPanel, PerfMeter, VerifyGate, Zustand stores)
-  - WASM 소스: `ch13-wasm/wasm-src/myslam/bindings/bind_hello.cpp` (+ `CMakeLists.txt`, `build.sh`)
-  - 빌드 산출물: `ch13-wasm/public/wasm/myslam_hello.baseline.{js,wasm}` (Phase A 검증용)
+  - WASM hello 소스: `ch13-wasm/wasm-src/myslam/bindings/bind_hello.cpp`
+  - Phase A+ 스파이크: `ch13-wasm/wasm-src/spike/{bind_pnp_spike.cpp, bind_ba_spike.cpp, verify_pnp.mjs, verify_ba.mjs, verify_pnp_diag*.mjs}`
+  - 빌드 스크립트: `ch13-wasm/wasm-src/{CMakeLists.txt, build.sh}` — `bash build.sh [baseline|simd|mt|mt-simd] [hello|pnp_spike|ba_spike]`
+  - g2o submodule (modern master): `ch13-wasm/wasm-src/third_party/g2o/`
+  - 빌드 산출물: `ch13-wasm/public/wasm/myslam_{hello,pnp_spike,ba_spike}.<variant>.{js,wasm}`
 - (예정) 단계별 학습 노트: `docs/steps/NN-*.md`
 
 ---
@@ -122,6 +131,37 @@
 | `GET /step/nonexistent` | `200 text/html` (router의 `path: '*'` → Navigate `/`로 클라이언트 리다이렉트될 것으로 기대) |
 | `GET /src/main.tsx`, `/src/wasm/loader.ts` | `200 text/javascript` — Vite 모듈 그래프 정상 |
 | `index.html` 내용 | `<div id="root">` + `/src/main.tsx` 모듈 로드 태그 포함 |
+
+---
+
+## Phase A+ 스파이크 완료 체크리스트 (2026-04-18)
+
+### Stage 1 — PnP (g2o core + solver_dense, pose-only)
+
+- [x] `wasm-src/third_party/g2o/` 새 submodule: modern master `502c4077` (cmake 3.14, C++17 친화)
+- [x] CMake 통합: `DISABLE_SSE*=ON`, `G2O_USE_{CHOLMOD,CSPARSE,OPENGL,OPENMP,LOGGING,LGPL_LIBS}=OFF`, `cxx_std_17` 강제, `-fexceptions`, `EIGEN3_DIR`을 Homebrew cellar로 연결
+- [x] 커스텀 `VertexPoseSE3`(Isometry3d 기반 left-update) + `EdgeReprojectionPoseOnly` + ch13과 동일한 2×6 Jacobian 해석해
+- [x] 빌드 성공: `public/wasm/myslam_pnp_spike.baseline.{js,wasm}` (~376 KB wasm)
+- [x] `node wasm-src/spike/verify_pnp.mjs` — SLAM-style prior(GT ± 0.3) init:
+  - 노이즈 없음 5케이스(N=40): `rotErr ≤ 2.5e-16 rad`, `trErr ≤ 6.6e-14` (machine precision)
+  - 1px Gaussian 노이즈 3케이스(N=80): `rotErr < 1e-3 rad`, `trErr < 2e-3`
+- [x] 진단 결과 (`verify_pnp_diag{,2}.mjs`): GT 포즈로 init 시 chi²≈1.4e-26 → computeError/Jacobian 모두 정확. Identity init 시 수렴 실패는 **멀어진 init + 큰 pixel residual이 LM linearization을 깨뜨리는 문제**이며 ch13의 Frontend가 `relative_motion * last_pose`로 항상 좋은 prior를 주는 이유와 일치.
+
+### Stage 2 — Bundle Adjustment (g2o core + solver_eigen, binary edge + Schur)
+
+- [x] Binary edge `EdgeProjection`(pose+landmark), `VertexXYZ`, `setMarginalized(true)` 경로
+- [x] `solver_eigen`(SimplicialLLT<SparseMatrix>) — sparse 선형대수 실제 사용(`grep` 검증 완료)
+- [x] 빌드 성공: `public/wasm/myslam_ba_spike.baseline.{js,wasm}`
+- [x] `node wasm-src/spike/verify_ba.mjs` — 1 fixed pose + 2~3 free poses + 20~40 landmarks:
+  - 노이즈 없음 3케이스: `chi²` 1.97e+5 → 1.08e-22 (~28자릿수 감소), maxRot ≤ 2.4e-13 rad
+  - 1px 노이즈 3케이스: `chi²` 1.28e+6 → 2.14e+2 (3.5자릿수 감소), maxRot < 6e-3 rad
+  - 무노이즈에서 남는 maxTr(≤3e-3)·maxLm(≤2.6e-2)는 **모노큘러 BA의 scale gauge 자유도** (기대 동작)
+
+### Gate 판정
+
+- **결과**: ✅ **g2o 경로 유지** — PLAN.md §9 Phase A+ Gate 조건의 "성공" 분기.
+- **근거**: Emscripten에서 g2o core + Eigen + dense/sparse 선형 솔버가 빌드·링크·수렴. Stage 2는 CXSparse를 solver_eigen으로 대체했으나 gate의 본질 질문("g2o 기반 sparse BA가 WASM에서 동작")은 답변됨.
+- **남은 열린 질문**: CXSparse 자체의 Emscripten 빌드는 미검증 — Phase G 성능 측정 후 재평가.
 
 ---
 

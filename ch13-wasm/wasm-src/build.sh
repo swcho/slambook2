@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
-# Build a single WASM variant. Usage: bash wasm-src/build.sh [baseline|simd|mt|mt-simd]
+# Build a single WASM variant. Usage:
+#   bash wasm-src/build.sh [baseline|simd|mt|mt-simd] [hello|pnp_spike]
 set -euo pipefail
 
 VARIANT="${1:-baseline}"
+TARGET="${2:-hello}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-BUILD_DIR="$SCRIPT_DIR/build/$VARIANT"
+BUILD_DIR="$SCRIPT_DIR/build/${TARGET}_${VARIANT}"
 OUT_DIR="$ROOT_DIR/public/wasm"
 
 # Homebrew's /opt/homebrew/bin/emcc wrapper sets PYTHON but the inner
@@ -31,21 +33,30 @@ if ! command -v emcmake >/dev/null 2>&1; then
   exit 1
 fi
 
-echo "[build.sh] variant=$VARIANT build=$BUILD_DIR out=$OUT_DIR"
+echo "[build.sh] target=$TARGET variant=$VARIANT build=$BUILD_DIR out=$OUT_DIR"
 mkdir -p "$BUILD_DIR" "$OUT_DIR"
 
 emcmake cmake -S "$SCRIPT_DIR" -B "$BUILD_DIR" \
   -DCH13_WASM_VARIANT="$VARIANT" \
-  -DCMAKE_BUILD_TYPE=Release
+  -DCH13_WASM_TARGET="$TARGET" \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_POLICY_VERSION_MINIMUM=3.5
 
-cmake --build "$BUILD_DIR" --parallel
+case "$TARGET" in
+  hello)      BUILD_TGT="myslam_hello"      ; OUT_BASE="myslam_hello.$VARIANT"      ;;
+  pnp_spike)  BUILD_TGT="myslam_pnp_spike"  ; OUT_BASE="myslam_pnp_spike.$VARIANT"  ;;
+  ba_spike)   BUILD_TGT="myslam_ba_spike"   ; OUT_BASE="myslam_ba_spike.$VARIANT"   ;;
+  *) echo "unknown target: $TARGET" >&2; exit 1 ;;
+esac
+
+cmake --build "$BUILD_DIR" --parallel --target "$BUILD_TGT"
 
 # Copy the produced .js + .wasm (and .worker.js for mt variants) into public/wasm.
 for ext in js wasm worker.js; do
-  src="$BUILD_DIR/myslam_hello.$VARIANT.$ext"
+  src="$BUILD_DIR/$OUT_BASE.$ext"
   if [ -f "$src" ]; then
     cp "$src" "$OUT_DIR/"
-    echo "  -> $OUT_DIR/myslam_hello.$VARIANT.$ext"
+    echo "  -> $OUT_DIR/$OUT_BASE.$ext"
   fi
 done
 

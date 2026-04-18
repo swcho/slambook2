@@ -16,3 +16,6 @@
 [submodule "3rdparty/googletest"]
 	path = 3rdparty/googletest
 	url = https://github.com/google/googletest.git
+[submodule "ch13-wasm/wasm-src/third_party/g2o"]
+	path = ch13-wasm/wasm-src/third_party/g2o
+	url = https://github.com/RainerKuemmerle/g2o.git

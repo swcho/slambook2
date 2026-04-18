@@ -15,10 +15,10 @@ wasm-src/build/
 !wasm-src/build.sh
 
 
-# emsdk / third-party (if vendored later)
+# emsdk / third-party (if vendored later as plain copies, not submodules)
 wasm-src/third_party/emsdk/
 wasm-src/third_party/eigen/
 wasm-src/third_party/sophus/
 wasm-src/third_party/opencv-minimal/
-wasm-src/third_party/g2o/
 wasm-src/third_party/cxsparse/
+# g2o lives here as a git submodule (see .gitmodules) — explicitly tracked.
