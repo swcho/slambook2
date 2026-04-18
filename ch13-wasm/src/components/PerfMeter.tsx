@@ -1,9 +1,8 @@
 import { useBenchStore } from '../state/benchStore';
 
 export function PerfMeter({ stepId }: { stepId: number }) {
-  const samples = useBenchStore((s) =>
-    s.samples.filter((x) => x.step === stepId),
-  );
+  const allSamples = useBenchStore((s) => s.samples);
+  const samples = allSamples.filter((x) => x.step === stepId);
   const last = samples.at(-1);
   return (
     <section
