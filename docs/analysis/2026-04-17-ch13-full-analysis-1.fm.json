@@ -1,0 +1,77 @@
+{
+  "version": 1,
+  "items": [
+    {
+      "question": "slambook2 ch13의 myslam 프로젝트는 무엇인가?",
+      "answer": "《14강으로 배우는 SLAM》 13장의 완전한 스테레오 Visual Odometry 구현이다. KITTI 스테레오 이미지 시퀀스를 입력으로 받아 LK 광학 흐름과 g2o 비선형 최적화로 카메라 궤적과 3D 지도를 실시간 구축한다."
+    },
+    {
+      "question": "myslam에서 실시간성을 확보하는 핵심 설계는 무엇인가?",
+      "answer": "프론트엔드(추적)와 백엔드(번들 조정)를 별도 스레드로 분리하는 것이다. 프론트엔드는 매 프레임 추적을 담당하고 백엔드는 백그라운드에서 최적화를 수행한다."
+    },
+    {
+      "question": "myslam의 기술 스택(언어·라이브러리)은?",
+      "answer": "C++11, CMake, Eigen3, Sophus, OpenCV 3.1+, G2O+CSparse, Pangolin, glog, gflags, GTest로 구성된다."
+    },
+    {
+      "question": "Sophus 라이브러리가 myslam에서 담당하는 역할은?",
+      "answer": "SE3(회전+병진)과 SO3(회전) 같은 리 군/리 대수 연산을 제공한다. 카메라 포즈 표현과 업데이트에 사용된다."
+    },
+    {
+      "question": "myslam의 디렉토리 구조에서 `app/`, `include/myslam/`, `src/`의 역할은?",
+      "answer": "`app/`은 진입점(`run_kitti_stereo.cpp`)을 포함하고, `include/myslam/`은 헤더 선언을, `src/`는 그 구현을 담당한다."
+    },
+    {
+      "question": "`config/default.yaml`의 용도는?",
+      "answer": "런타임 설정 파일로 데이터셋 경로, 특징점 수 등 파라미터를 정의한다. `Config` 싱글톤이 이를 파싱하여 전역으로 제공한다."
+    },
+    {
+      "question": "myslam의 주요 아키텍처 패턴 4가지는?",
+      "answer": "파이프라인 패턴(Dataset→Frontend→Map←Backend), 생산자-소비자 패턴(condition_variable), 팩토리 메서드(`CreateFrame`, `CreateNewMappoint`), shared_ptr/weak_ptr 소유권 설계이다."
+    },
+    {
+      "question": "Feature ↔ MapPoint 간 순환 참조를 어떻게 차단하는가?",
+      "answer": "한쪽을 `weak_ptr`로 설계하여 강한 참조 순환을 방지한다. 이를 통해 shared_ptr 기반에서도 메모리 누수가 발생하지 않는다."
+    },
+    {
+      "question": "myslam의 진입점(main) 호출 순서는?",
+      "answer": "`VisualOdometry` 생성 → `Init()`(컴포넌트 생성 및 연결) → `Run()`(루프 실행) 순이다."
+    },
+    {
+      "question": "시스템 초기화(`VO::Init`) 시 Backend와 Viewer는 어떻게 실행되는가?",
+      "answer": "Backend와 Viewer는 생성 시점에 별도 스레드로 시작된다. 이후 VO가 SetMap/SetCameras 등 의존성을 주입한다."
+    },
+    {
+      "question": "스테레오 초기화(첫 키프레임) 단계의 주요 절차는?",
+      "answer": "`DetectFeatures`(GFTT) → `FindFeaturesInRight`(LK 광학흐름) → `BuildInitMap`(스테레오 삼각화) → `InsertKeyFrame`/`InsertMapPoint` → Backend `UpdateMap`으로 condition_variable notify한다."
+    },
+    {
+      "question": "정상 추적 루프에서 매 프레임 수행되는 핵심 단계는?",
+      "answer": "`TrackLastFrame`(LK로 이전→현재 추적) → `EstimateCurrentPose`(g2o PnP 포즈만 최적화) → inlier 수에 따라 상태 갱신 → 조건 충족 시 키프레임 삽입·삼각화·Map/Backend/Viewer 업데이트이다."
+    },
+    {
+      "question": "Frontend의 상태 머신 전이는 어떻게 정의되는가?",
+      "answer": "`INITING → TRACKING_GOOD`(충분한 특징점), `TRACKING_GOOD ↔ TRACKING_BAD`, 그리고 `TRACKING_BAD → LOST`(inliers < 20)이다."
+    },
+    {
+      "question": "Frontend의 `EstimateCurrentPose`에서 아웃라이어를 어떻게 판별하는가?",
+      "answer": "4 라운드 반복 최적화를 수행하며 각 라운드에서 chi² > 5.991인 엣지를 아웃라이어로 마킹한다. 3라운드 이후 RobustKernel을 제거해 수렴 정밀도를 높인다."
+    },
+    {
+      "question": "`TrackLastFrame`에서 LK 추적의 초기 추정치를 어떻게 개선하는가?",
+      "answer": "맵포인트가 있는 특징점의 경우 해당 3D 점을 현재 포즈로 투영한 값을 초기 추정치로 사용한다. 이로써 LK 수렴 속도와 안정성이 향상된다."
+    },
+    {
+      "question": "Frontend의 주요 파라미터와 기본값은?",
+      "answer": "`num_features=150`, `num_features_init=50`, `num_features_tracking=50`, `num_features_tracking_bad=20`, `num_features_needed_for_keyframe=80`이다."
+    },
+    {
+      "question": "Backend의 `Optimize` 절차는 어떻게 구성되는가?",
+      "answer": "VertexPose(6-DOF SE3)와 VertexXYZ(3D) 정점을 추가하고 EdgeProjection 이항 엣지를 생성한다. VertexXYZ에 `setMarginalized(true)`로 Schur 보완을 적용하고 적응적 chi² 임계값으로 아웃라이어를 제거한다."
+    },
+    {
+      "question": "Backend의 적응적 아웃라이어 임계값 전략은?",
+      "answer": "아웃라이어 비율이 50%를 초과하면 chi² 임계값을 2배씩 증가시키며 최대 5회까지 반복한다. 이는 노이즈 환경에서도 안정적 수렴을 돕는다."
+    }
+  ]
+}

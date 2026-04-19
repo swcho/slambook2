@@ -2,3 +2,13 @@
 : 1775680446:0;claude
 : 1776428302:0;exit
 : 1776428307:0;claude
+: 1776491801:0;npm run dev
+: 1776491810:0;ll
+: 1776491817:0;cd ch13-wasm
+: 1776491818:0;ll
+: 1776491822:0;npm install
+: 1776491827:0;npm run dev
+: 1776492009:0;claude
+: 1776515927:0;claude --version
+: 1776515930:0;claude
+: 1776565356:0;flash-man file-v2

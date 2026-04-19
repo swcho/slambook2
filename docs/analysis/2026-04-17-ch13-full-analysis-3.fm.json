@@ -1,0 +1,73 @@
+{
+  "version": 1,
+  "items": [
+    {
+      "question": "Active Window란 무엇인가?",
+      "answer": "최근 N개의 키프레임 집합으로 슬라이딩 윈도우 BA의 대상이 된다. myslam에서는 기본값 7개이다."
+    },
+    {
+      "question": "LK Flow의 의미는?",
+      "answer": "Lucas-Kanade 피라미드 광학 흐름으로, 이전 프레임에서 검출된 특징점을 현재 프레임으로 추적하는 데 사용된다."
+    },
+    {
+      "question": "myslam의 코드 품질 강점 5가지는?",
+      "answer": "프론트엔드/백엔드 스레드 분리, shared/weak_ptr 순환 차단, 팩토리 패턴 ID 관리, 적응적 아웃라이어 chi² 임계값, LK 초기 추정치로 맵포인트 투영 활용이다."
+    },
+    {
+      "question": "myslam의 주요 개선 가능 지점은?",
+      "answer": "`Reset()` 미구현(LOST 시 재초기화 없음), 삼각화 반환 로직 버그, features_right_ 인덱스 정렬 의존성, Viewer 카메라 파라미터 하드코딩이다."
+    },
+    {
+      "question": "복잡도가 높은 코드 영역 두 곳은?",
+      "answer": "Frontend의 `EstimateCurrentPose`(반복 최적화+아웃라이어+RobustKernel 제거 중첩)와 Backend의 `Optimize`(정점 삭제 없이 `setLevel(1)`로 엣지 비활성화하는 g2o 관용구)이다."
+    },
+    {
+      "question": "`viewer.cpp`의 `usleep(5000)`이 가진 잠재적 이슈는?",
+      "answer": "하드코딩된 슬립이기 때문에 시스템 부하에 따라 실시간성 저하 가능성이 있다. 적응적 타이밍이 바람직하다."
+    },
+    {
+      "question": "`Config` 싱글톤의 스레드 안전성은?",
+      "answer": "첫 초기화(`SetParameterFile`) 시점에 race condition 가능성이 이론적으로 있다. 그러나 초기화 이후는 읽기만 일어나므로 실용적으로 안전하다."
+    },
+    {
+      "question": "myslam 코드 이해를 위한 필수 파일 읽기 순서는?",
+      "answer": "`common_include.h` → `frame.h`+`mappoint.h`+`feature.h` → `frontend.h`+`frontend.cpp` → `g2o_types.h` → `backend.cpp` 순이다."
+    },
+    {
+      "question": "추적 파라미터를 조정하려면 어떤 파일을 수정하는가?",
+      "answer": "`config/default.yaml`을 수정한다. `num_features`, `num_features_init`, `num_features_tracking` 등을 조정할 수 있다."
+    },
+    {
+      "question": "키프레임 삽입 정책을 변경하려면 어디를 수정하는가?",
+      "answer": "`src/frontend.cpp`의 `InsertKeyframe()` 함수를 수정한다."
+    },
+    {
+      "question": "슬라이딩 윈도우 크기는 어디에서 변경하는가?",
+      "answer": "`include/myslam/map.h`의 `num_active_keyframes_` 값을 수정한다. 기본값은 7이다."
+    },
+    {
+      "question": "추적 실패 시 디버깅 방법은?",
+      "answer": "`LOG(INFO) \"Outlier/Inlier in pose estimating\"` 로그로 inlier 수를 확인한다. 수가 너무 적다면 임계값·텍스처·조명을 점검한다."
+    },
+    {
+      "question": "초기화 실패 시 해결 팁은?",
+      "answer": "`num_features_init` 값을 낮추거나, 첫 프레임의 텍스처가 충분한지 확인한다."
+    },
+    {
+      "question": "삼각화 실패 디버깅 시 점검 항목은?",
+      "answer": "`pworld[2] > 0` 조건 실패 시 스테레오 기선(baseline) 값을 확인한다. baseline이 잘못되면 깊이가 음수로 나올 수 있다."
+    },
+    {
+      "question": "G2O 빌드 오류가 날 때 의심해볼 점은?",
+      "answer": "G2O가 `make_unique`를 요구하는 경우 C++14 이상이 필요할 수 있다. CMake의 CXX 표준 설정을 확인한다."
+    },
+    {
+      "question": "팩토리 메서드 패턴이 myslam에서 어떻게 사용되는가?",
+      "answer": "`Frame::CreateFrame()`과 `MapPoint::CreateNewMappoint()`가 전역 ID를 자동 부여하며 원자적으로 객체를 생성한다. 이는 ID 중복을 방지한다."
+    },
+    {
+      "question": "Backend 과부하 시 완화 방법은?",
+      "answer": "`optimizer.optimize(10)`의 반복 수를 줄이거나 active window 크기(`num_active_keyframes_`)를 축소한다."
+    }
+  ]
+}

@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "items": [
+    {
+      "question": "Stage 1에서 BlockSolverTraits의 `<6, 3>` 의미는?",
+      "answer": "pose block이 6×6, landmark block이 3×3임을 나타낸다. PnP는 landmark를 최적화하지 않지만 타입은 그대로 유지한다."
+    },
+    {
+      "question": "`solvePnP` Embind 인터페이스의 `points3d_flat` 배열 구조는?",
+      "answer": "길이 3N의 double 배열이며 `[x0, y0, z0, x1, y1, z1, ...]` 순서로 3D 점들을 나열한다."
+    },
+    {
+      "question": "`solvePnP`의 `init_pose6` 파라미터 형식은?",
+      "answer": "길이 0 또는 6 배열이며 `[tx, ty, tz, rx, ry, rz]` 형태이다. (rx,ry,rz)는 axis-angle이며, 빈 배열이면 Identity로 초기화된다."
+    },
+    {
+      "question": "`PnPResult.Tcw_row_major`를 JS에서 어떻게 접근해야 하는가?",
+      "answer": "`emscripten::register_vector<double>`로 등록된 `VectorDouble` 핸들이므로 `.get(i)`와 `.size()`로 접근해야 하며, `Array.prototype.slice`는 동작하지 않는다."
+    },
+    {
+      "question": "Stage 1 빌드 및 검증 명령은?",
+      "answer": "빌드는 `bash wasm-src/build.sh baseline pnp_spike`이고, 검증은 `node wasm-src/spike/verify_pnp.mjs`이다."
+    },
+    {
+      "question": "Stage 1 Noiseless 시나리오의 최종 chi² 범위는?",
+      "answer": "N=40, GT ± 0.3 초기화, 5 seed 기준 최종 chi²는 10⁻¹⁹ ~ 10⁻²⁵ 수준이며, 회전 오차는 0 ~ 2.5×10⁻¹⁶ rad이다."
+    },
+    {
+      "question": "Stage 1의 1 px Gaussian 노이즈 시나리오 결과는?",
+      "answer": "N=80, 3 seed 기준 최종 chi² 1.5×10² ~ 1.8×10², 회전 오차 6×10⁻⁴ ~ 1×10⁻³ rad, translation 오차 5.7×10⁻⁴ ~ 1.1×10⁻³으로 PASS이다."
+    },
+    {
+      "question": "Stage 2(`bind_ba_spike.cpp`)의 목표는 무엇인가?",
+      "answer": "여러 카메라 포즈와 여러 landmark를 동시에 최적화하는 BA 문제를 이항 엣지 + `setMarginalized(true)` Schur complement 파이프라인으로 WASM에서 푸는 것이 가능한지 검증하는 것이다."
+    },
+    {
+      "question": "`VertexXYZ` 클래스의 정의는?",
+      "answer": "`g2o::BaseVertex<3, Eigen::Vector3d>`를 상속하며 월드 3D 점을 표현한다. `oplusImpl`은 `_estimate += Map<Vector3d>(update)`로 단순 덧셈을 수행한다."
+    },
+    {
+      "question": "`EdgeProjection` 이항 엣지의 연결 정점과 측정 차원은?",
+      "answer": "측정 차원 2, 연결 정점 2개(`VertexPoseSE3` pose와 `VertexXYZ` landmark)이다. `BaseBinaryEdge<2, Vector2d, VertexPoseSE3, VertexXYZ>`를 상속한다."
+    },
+    {
+      "question": "`EdgeProjection::linearizeOplus`에서 채워야 하는 두 Jacobian은?",
+      "answer": "pose에 대한 `_jacobianOplusXi`(2×6)와 landmark에 대한 `_jacobianOplusXj`(2×3) 두 개이다."
+    },
+    {
+      "question": "landmark Jacobian $\\partial e / \\partial P_w$는 어떻게 계산되는가?",
+      "answer": "$P_c = R P_w + t$이므로 $\\partial P_c / \\partial P_w = R$이다. 따라서 `_jacobianOplusXj = _jacobianOplusXi.block<2,3>(0,0) * T.linear()` 한 줄로 구현된다."
+    },
+    {
+      "question": "landmark Jacobian에서 `_jacobianOplusXi`의 앞 3열을 쓸 수 있는 이유는?",
+      "answer": "$\\partial e / \\partial \\rho = \\partial e / \\partial P_c \\cdot I$이므로 pose Jacobian의 translation block이 $\\partial e / \\partial P_c$와 완전히 동일하기 때문이다."
+    },
+    {
+      "question": "Stage 2와 Stage 1의 선형 솔버 차이점은?",
+      "answer": "Stage 1은 `LinearSolverDense`로 Eigen LLT를 쓰지만, Stage 2는 `LinearSolverEigen`으로 `Eigen::SimplicialLLT<SparseMatrix, Upper>` 진짜 sparse Cholesky를 사용한다."
+    }
+  ]
+}

@@ -1,0 +1,77 @@
+{
+  "version": 1,
+  "items": [
+    {
+      "question": "Backend 최적화 후 Feature와 MapPoint에는 어떤 업데이트가 일어나는가?",
+      "answer": "Feature의 `is_outlier_` 플래그를 갱신하고, 아웃라이어로 판정된 관측은 해당 MapPoint에서 제거된다."
+    },
+    {
+      "question": "Backend가 사용하는 선형 솔버와 그 이유는?",
+      "answer": "CSparse(희소 행렬 특화) 선형 솔버를 사용한다. BA의 Hessian이 매우 희소하므로 sparse 솔버가 효율적이다."
+    },
+    {
+      "question": "`Map` 클래스의 슬라이딩 윈도우 정책은?",
+      "answer": "`num_active_keyframes_ = 7`로 최대 7개를 유지하며, 초과 시 `RemoveOldKeyframe`을 호출한다. 현재 프레임과 매우 가까운(중복) 프레임을 우선 제거하고, 없으면 가장 먼 프레임을 제거하여 공간 다양성을 확보한다."
+    },
+    {
+      "question": "`Map`의 스레드 안전성은 어떻게 보장되는가?",
+      "answer": "모든 읽기/쓰기 연산에 `data_mutex_` 잠금을 적용한다. Frontend/Backend/Viewer 세 스레드가 동시 접근하므로 필수적이다."
+    },
+    {
+      "question": "`g2o_types.h`에 정의된 4개의 주요 클래스와 역할은?",
+      "answer": "`VertexPose`(카메라 포즈, SE3 왼쪽 곱 업데이트), `VertexXYZ`(3D 랜드마크), `EdgeProjectionPoseOnly`(프론트엔드 PnP 단항 엣지), `EdgeProjection`(백엔드 BA 이항 엣지)이다."
+    },
+    {
+      "question": "`EdgeProjection::linearizeOplus`는 어떤 Jacobian을 계산하는가?",
+      "answer": "포즈에 대한 2×6 Jacobian과 랜드마크에 대한 2×3 Jacobian을 해석적으로 계산한다. 수치 미분 대비 속도와 정확도가 뛰어나다."
+    },
+    {
+      "question": "`algorithm.h`의 SVD 선형 삼각화 절차는?",
+      "answer": "각 관측에서 `[x·m3 - m1; y·m3 - m2] * X = 0` 두 방정식을 생성하여 행렬 A(2N×4)로 쌓은 뒤 BDC-SVD 분해한다. 최소 특이값에 해당하는 V의 마지막 열이 해이다."
+    },
+    {
+      "question": "삼각화 해의 품질은 어떻게 판정하며, 알려진 버그는?",
+      "answer": "$\\sigma_4 / \\sigma_3 < 0.01$이면 품질 불량으로 판정한다. 원서 버그로 반환 로직이 반전되어 있어 품질이 좋을 때 `false`, 나쁠 때 `true`를 반환한다."
+    },
+    {
+      "question": "`Dataset` 클래스의 역할과 특이 사항은?",
+      "answer": "KITTI `calib.txt`에서 P0~P3를 파싱해 fx, fy, cx, cy, baseline을 추출하고 Frame을 순차 제공한다. 처리 속도 개선을 위해 이미지를 0.5배로 다운샘플링한다."
+    },
+    {
+      "question": "KITTI 이미지 파일 경로 형식은?",
+      "answer": "`{dataset_dir}/image_{0,1}/{index:06d}.png` 형식이다. `image_0`은 좌측, `image_1`은 우측 카메라이다."
+    },
+    {
+      "question": "myslam의 스레드 구성 3가지는?",
+      "answer": "Main(Dataset 읽기 + Frontend 호출), Backend(번들 조정 루프, `condition_variable map_update_`로 동기화), Viewer(Pangolin 렌더링 루프, `viewer_data_mutex_`로 동기화)이다."
+    },
+    {
+      "question": "Frame의 포즈에 접근할 때 어떤 뮤텍스를 사용하는가?",
+      "answer": "`pose_mutex_`를 사용한다. Map의 `data_mutex_`와는 별도의 세분화된 락으로 관리되어 스레드 경합을 줄인다."
+    },
+    {
+      "question": "myslam의 전체 데이터 흐름은?",
+      "answer": "KITTI 디스크 → `Dataset::NextFrame` → Frame → Frontend(Feature 검출·추적, g2o PnP) → 키프레임 삽입 시 삼각화 → MapPoint 생성 → Map → Backend(번들 조정), Viewer(Pangolin 3D 렌더링)이다."
+    },
+    {
+      "question": "myslam의 빌드 명령은?",
+      "answer": "`cd ch13 && mkdir build && cd build && cmake .. -DCMAKE_BUILD_TYPE=Release && make -j4`로 수행한다."
+    },
+    {
+      "question": "myslam의 실행 명령은?",
+      "answer": "`./bin/run_kitti_stereo --config_file ./config/default.yaml`로 실행한다."
+    },
+    {
+      "question": "myslam이 필요로 하는 주요 외부 의존성은?",
+      "answer": "OpenCV 3.1+, Eigen3, Sophus, G2O(core, types_sba, solver_csparse), Pangolin, glog, gflags, GTest, CSparse이다."
+    },
+    {
+      "question": "Tcw와 Twc의 차이점은?",
+      "answer": "Tcw는 세계→카메라 변환으로 `frame.pose_`에 저장되고, Twc는 카메라→세계 변환으로 `pose_.inverse()`로 얻어진다."
+    },
+    {
+      "question": "KeyFrame과 일반 Frame의 차이는?",
+      "answer": "Frame은 한 시점의 스테레오 이미지 쌍이고, KeyFrame은 지도 최적화의 기준이 되는 대표 프레임이다. 모든 Frame이 KeyFrame이 되는 것은 아니다."
+    }
+  ]
+}

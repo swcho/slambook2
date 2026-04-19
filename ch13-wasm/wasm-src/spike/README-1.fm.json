@@ -1,0 +1,65 @@
+{
+  "version": 1,
+  "items": [
+    {
+      "question": "Phase A+ WASM Spike의 핵심 검증 질문은 무엇인가?",
+      "answer": "g2o + Eigen + sparse 선형 솔버가 Emscripten/WASM 환경에서 빌드, 링크, 수렴 가능한지를 실증적으로 검증하는 것이다. PLAN.md §9 Phase A+ Gate의 핵심 질문이다."
+    },
+    {
+      "question": "Phase A+ Spike는 어떤 두 가지 바인딩으로 구성되는가?",
+      "answer": "Stage 1의 `bind_pnp_spike.cpp`(pose-only PnP, 단항 엣지, solver_dense)와 Stage 2의 `bind_ba_spike.cpp`(full BA, 이항 엣지 + Schur, solver_eigen)로 구성된다."
+    },
+    {
+      "question": "$T_{cw}$ 기호의 의미는 무엇인가?",
+      "answer": "월드 좌표계에서 카메라 좌표계로의 $SE(3)$ 변환을 의미하며, $P_c = T_{cw} \\cdot P_w$ 관계를 가진다."
+    },
+    {
+      "question": "$SE(3)$의 tangent vector $\\xi$는 어떻게 구성되는가?",
+      "answer": "$\\xi = [\\rho; \\phi] \\in \\mathbb{R}^6$로 구성되며, $\\rho$는 translation tangent, $\\phi$는 rotation tangent(axis-angle)이다."
+    },
+    {
+      "question": "핀홀 투영에서 $P_c = (X, Y, Z)$의 픽셀 좌표는 어떻게 계산되는가?",
+      "answer": "$u = \\frac{f_x X}{Z} + c_x$, $v = \\frac{f_y Y}{Z} + c_y$ 로 계산된다."
+    },
+    {
+      "question": "본 스파이크가 사용하는 $SE(3)$ left-multiplicative update 수식은?",
+      "answer": "$T' = \\exp(\\xi^{\\wedge}) \\cdot T$ 형태의 left 곱 convention을 사용하며, 이는 ch13 책과 동일한 규약이다."
+    },
+    {
+      "question": "Sophus 대신 `Eigen::Isometry3d`를 사용한 단순화는 무엇이며 왜 가능한가?",
+      "answer": "translation에 $V(\\phi) \\cdot \\rho$ 대신 $\\rho$를 직접 사용하는 근사를 적용한다. 1차 근사에서 동일하고, LM 수렴 시 step이 작아져 차이가 사라지므로 가능하다."
+    },
+    {
+      "question": "본 스파이크의 reprojection error 정의는 무엇인가?",
+      "answer": "측정값에서 예측값을 뺀 형태 $e(T) = z - \\hat{z}(T)$로 정의하며, 이는 ch13 convention을 따른다."
+    },
+    {
+      "question": "pose-only Jacobian $\\partial e / \\partial \\xi$의 차원과 유도 체인은?",
+      "answer": "2×6 블록이며, $\\partial P_c / \\partial \\rho = I$, $\\partial P_c / \\partial \\phi = -[P_c]_\\times$, $\\partial \\pi / \\partial P_c$의 체인 룰과 $e = z - \\hat{z}$의 부호 반전으로 유도된다."
+    },
+    {
+      "question": "Stage 1(`bind_pnp_spike.cpp`)의 목표는 무엇인가?",
+      "answer": "주어진 3D 월드 점과 2D 픽셀 관측으로부터 카메라 포즈 $T_{cw}$ 하나만을 최적화하여 재투영 오차를 최소화하는 것이다. vertex 1개, edge N개, dense solver의 최소 구성이다."
+    },
+    {
+      "question": "`VertexPoseSE3` 클래스의 주요 속성은?",
+      "answer": "`g2o::BaseVertex<6, Eigen::Isometry3d>`를 상속하며, 상태 차원은 6(SE(3) tangent), 저장 타입은 4×4 동차 변환이다. `setToOriginImpl`은 Identity로 초기화한다."
+    },
+    {
+      "question": "`VertexPoseSE3::oplusImpl`은 어떻게 구현되는가?",
+      "answer": "update의 앞 3요소를 $\\rho$, 뒤 3요소를 $\\phi$로 읽고 `AngleAxisd`로 $R_{exp}$를 계산한 뒤, `dT = (R_exp, \\rho)`를 left 곱으로 적용(`_estimate = dT * _estimate`)한다."
+    },
+    {
+      "question": "`EdgeReprojectionPoseOnly`의 정의와 특징은?",
+      "answer": "`BaseUnaryEdge<2, Vector2d, VertexPoseSE3>`로 측정 차원 2, 연결 정점 1개이다. 생성자에 월드 3D 점과 K를 상수로 주입하며, landmark는 최적화 대상이 아니다."
+    },
+    {
+      "question": "Stage 1에서 numerical Jacobian 대신 해석적 Jacobian을 쓴 이유는?",
+      "answer": "속도 향상과 LM convergence 안정성을 위해서이다. `linearizeOplus()`에서 2×6 Jacobian을 직접 채운다."
+    },
+    {
+      "question": "Stage 1의 최적화 알고리즘 세팅은?",
+      "answer": "`BlockSolver<BlockSolverTraits<6, 3>> + LinearSolverDense + LevenbergMarquardt` 조합을 사용하며, Eigen LLT로 6×6 Hessian을 푼다."
+    }
+  ]
+}
