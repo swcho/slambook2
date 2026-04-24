@@ -10,15 +10,19 @@
     "build:wasm:baseline": "bash wasm-src/build.sh baseline",
     "build:wasm:simd": "bash wasm-src/build.sh simd",
     "build:wasm:mt": "bash wasm-src/build.sh mt",
-    "build:wasm:mt-simd": "bash wasm-src/build.sh mt-simd"
+    "build:wasm:mt-simd": "bash wasm-src/build.sh mt-simd",
+    "build:wasm:camera": "bash wasm-src/build.sh baseline camera",
+    "gen:dataset": "node --experimental-strip-types scripts/gen-kitti-mini.ts"
   },
   "dependencies": {
+    "@tanstack/react-query": "^5.100.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.28.0",
     "zustand": "^5.0.2"
   },
   "devDependencies": {
+    "@types/node": "^25.6.0",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.4",

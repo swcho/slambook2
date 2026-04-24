@@ -11,8 +11,10 @@ if(NOT DEFINED CH13_WASM_VARIANT)
 endif()
 
 # CH13_WASM_TARGET selects which target to build.
-#   hello  (Phase A)  — minimal hello_world binding
-#   pnp_spike (Phase A+ Stage 1) — g2o + Eigen PnP spike
+#   hello      (Phase A)         — minimal hello_world binding
+#   pnp_spike  (Phase A+ Stage 1) — g2o + Eigen PnP spike
+#   ba_spike   (Phase A+ Stage 2) — g2o + Eigen BA spike
+#   camera     (Phase B Step 2)   — minimal pinhole Camera binding
 if(NOT DEFINED CH13_WASM_TARGET)
   set(CH13_WASM_TARGET "hello")
 endif()
@@ -56,6 +58,37 @@ if(CH13_WASM_TARGET STREQUAL "hello")
 
   set_target_properties(myslam_hello PROPERTIES
     OUTPUT_NAME "myslam_hello.${CH13_WASM_VARIANT}"
+    SUFFIX ".js"
+  )
+endif()
+
+# -----------------------------------------------------------------------------
+# Target: camera (Phase B / Step 2) — header-only pinhole binding, no Eigen.
+# -----------------------------------------------------------------------------
+if(CH13_WASM_TARGET STREQUAL "camera")
+  add_executable(myslam_camera
+    myslam/bindings/bind_camera.cpp
+  )
+
+  target_compile_options(myslam_camera PRIVATE
+    -O3
+    ${VARIANT_FLAGS}
+  )
+
+  target_link_options(myslam_camera PRIVATE
+    -O3
+    --bind
+    -sMODULARIZE=1
+    -sEXPORT_ES6=1
+    -sEXPORT_NAME=createCameraModule
+    -sALLOW_MEMORY_GROWTH=1
+    -sENVIRONMENT=web,worker,node
+    -sWASM=1
+    ${VARIANT_LINK}
+  )
+
+  set_target_properties(myslam_camera PROPERTIES
+    OUTPUT_NAME "myslam_camera.${CH13_WASM_VARIANT}"
     SUFFIX ".js"
   )
 endif()

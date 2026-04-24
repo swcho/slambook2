@@ -1,13 +1,18 @@
+import type { ComponentType } from 'react';
+import { Step01Dataset } from './Step01_Dataset';
+import { Step02Camera } from './Step02_Camera';
+
 export interface StepMeta {
   id: number;
   slug: string;
   title: string;
   summary: string;
+  Component?: ComponentType;
 }
 
 export const STEPS: StepMeta[] = [
-  { id: 1,  slug: 'dataset',           title: 'Dataset Loader (KITTI)',        summary: '스테레오 쌍 + 캘리브레이션 로딩' },
-  { id: 2,  slug: 'camera',            title: 'Camera Model',                  summary: '핀홀 투영 / 역투영' },
+  { id: 1,  slug: 'dataset',           title: 'Dataset Loader (KITTI)',        summary: '스테레오 쌍 + 캘리브레이션 로딩', Component: Step01Dataset },
+  { id: 2,  slug: 'camera',            title: 'Camera Model',                  summary: '핀홀 투영 / 역투영', Component: Step02Camera },
   { id: 3,  slug: 'feature-detection', title: 'Feature Detection',             summary: 'GFTT / FAST / ORB / Harris' },
   { id: 4,  slug: 'stereo-matching',   title: 'Stereo Matching (LK)',          summary: 'LK 피라미드 광학 흐름' },
   { id: 5,  slug: 'triangulation',     title: 'Triangulation (SVD)',           summary: 'DLT 삼각화 + 조건수' },

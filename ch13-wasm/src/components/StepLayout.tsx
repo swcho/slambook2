@@ -2,15 +2,27 @@ import type { ReactNode } from 'react';
 import type { StepMeta } from '../steps';
 import { ParamPanel } from './ParamPanel';
 import { PerfMeter } from './PerfMeter';
-import { VerifyGate } from './VerifyGate';
+import { VerifyGate, type VerifyItem } from './VerifyGate';
+
+export interface StepLayoutProps {
+  step: StepMeta;
+  paramPanel?: ReactNode;
+  input?: ReactNode;
+  output?: ReactNode;
+  children?: ReactNode;
+  verifyItems?: VerifyItem[];
+  verifyChildren?: ReactNode;
+}
 
 export function StepLayout({
   step,
+  paramPanel,
+  input,
+  output,
   children,
-}: {
-  step: StepMeta;
-  children?: ReactNode;
-}) {
+  verifyItems,
+  verifyChildren,
+}: StepLayoutProps) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <header style={{ borderBottom: '1px solid #333', paddingBottom: 8 }}>
@@ -26,16 +38,17 @@ export function StepLayout({
           display: 'grid',
           gridTemplateColumns: '260px 1fr 1fr',
           gap: 16,
+          alignItems: 'start',
         }}
       >
-        <ParamPanel stepId={step.id} />
+        {paramPanel ?? <ParamPanel stepId={step.id} />}
         <section style={panelStyle}>
           <h3 style={h3Style}>Input</h3>
-          <div style={{ color: '#666' }}>(placeholder)</div>
+          {input ?? <div style={placeholderStyle}>(placeholder)</div>}
         </section>
         <section style={panelStyle}>
           <h3 style={h3Style}>Output</h3>
-          <div style={{ color: '#666' }}>(placeholder)</div>
+          {output ?? <div style={placeholderStyle}>(placeholder)</div>}
         </section>
       </div>
 
@@ -43,7 +56,9 @@ export function StepLayout({
 
       {children}
 
-      <VerifyGate stepId={step.id} />
+      <VerifyGate stepId={step.id} items={verifyItems}>
+        {verifyChildren}
+      </VerifyGate>
     </div>
   );
 }
@@ -63,3 +78,5 @@ const h3Style: React.CSSProperties = {
   textTransform: 'uppercase',
   letterSpacing: 0.5,
 };
+
+const placeholderStyle: React.CSSProperties = { color: '#666' };

@@ -4,8 +4,8 @@
 각 Phase/Step 종료 시 이 파일을 반드시 갱신하고 커밋해야 새 세션이 상태를 복원할 수 있다.
 
 - **시작일**: 2026-04-17
-- **최근 갱신**: 2026-04-18
-- **현재 진행 중**: — (Phase A+ **GATE ✅**. Eigen 벤더링 완료로 이식성 확보. 다음 세션은 **Phase B — Dataset + Camera** 착수)
+- **최근 갱신**: 2026-04-25
+- **현재 진행 중**: — (Phase B **완료**. Step 1 Dataset Loader + Step 2 Camera Model 게이트 통과. 다음 세션은 **Phase C — Feature Detection + Stereo LK** 착수)
 
 ---
 
@@ -18,8 +18,10 @@
 | hello_world WASM E2E | 🟡 Node 스모크 검증(`greet`/`add` 수치 일치) + `npm run dev` 헤드리스 검증(헤더·MIME·SPA fallback) 완료 — 브라우저 내 DOM 렌더링은 사용자 육안 확인 대기 |
 | dev 서버 헤드리스 검증 | ✅ 2026-04-18 완료 (아래 "Phase A 검증 기록" 참조) |
 | g2o WASM 스파이크 (Phase A+) | ✅ 2026-04-18 gate 통과 (Stage 1 PnP + Stage 2 BA 모두 수치 검증). CXSparse는 별도 open 질문으로 남김 |
+| Phase B Step 1 (Dataset Loader) | ✅ 2026-04-25 — KITTI 05 calib 파싱 + 5프레임 mini fixture + 좌/우 이미지 렌더링, 자동 verify gate 통과 |
+| Phase B Step 2 (Camera Model) | ✅ 2026-04-25 — WASM Camera 바인딩 round-trip 오차 1.06e-15 (60-point 그리드 기준, 임계 1e-5) |
 | 현재 브랜치 | `ex` |
-| 마지막 커밋 | `c85a59c` (progress: record Phase A headless verification) → 본 Phase A+ 커밋 예정 |
+| 마지막 커밋 | `ad45a65` (fm) → 본 Phase B 커밋 예정 |
 
 ---
 
@@ -29,7 +31,7 @@
 - [x] **Phase A+** — g2o/(C)Sparse WASM 스파이크 ⚠️ 가장 중요 (Gate) ← 2026-04-18 통과
   - 결과: **✅ success** — 원안대로 Phase B 이후 진행. g2o 경로 채택 (Stage 1 PnP 통과 + Stage 2 BA via `solver_eigen`/`SimplicialLLT` 통과)
   - Open follow-up: CXSparse 자체의 Emscripten 빌드는 미검증 — Phase G에서 성능이 부족하면 그때 통합 재평가
-- [ ] **Phase B** — Step 1~2 Dataset + Camera
+- [x] **Phase B** — Step 1~2 Dataset + Camera ← 2026-04-25 완료
 - [ ] **Phase C** — Step 3~4 Feature Detection + Stereo LK
 - [ ] **Phase D** — Step 5~6 Triangulation + Initial Map
 - [ ] **Phase E** — Step 7~8 Frame Tracking + PnP
@@ -44,8 +46,8 @@
 
 | Step | 구현 | 검증 게이트 통과 | 비고 |
 |------|------|----------------|------|
-| 1. Dataset Loader | ⬜ | ⬜ | |
-| 2. Camera Model | ⬜ | ⬜ | |
+| 1. Dataset Loader | ✅ | ✅ | KITTI 05 calib(P0~P3) 파싱 + downsample(0.25/0.5/1.0) + 좌/우 이미지 표시. 게이트: 4 카메라 파싱, baseline>0, L/R 해상도 일치, K·downsample 적용 |
+| 2. Camera Model | ✅ | ✅ | WASM `myslam_camera.baseline` 18 KB. 게이트: 60-point 그리드 round-trip maxErr < 1e-5 (실측 1.06e-15). P0/P1 extrinsic 선택 가능 |
 | 3. Feature Detection | ⬜ | ⬜ | |
 | 4. Stereo Matching (LK) | ⬜ | ⬜ | |
 | 5. Triangulation | ⬜ | ⬜ | |
@@ -76,6 +78,10 @@
 | 2026-04-18 | **g2o CMake 통합 플래그셋 확정**(WASM 빌드용) | `DO_SSE_AUTODETECT=OFF + DISABLE_SSE2/3/4_1/4_2/4_A=ON` 없으면 macOS에서도 `-msseN` 플래그가 남아 emcc 거부; `G2O_USE_CHOLMOD/CSPARSE/OPENGL/OPENMP/LOGGING/LGPL_LIBS=OFF` 로 외부 의존성 차단; `cxx_std_17`을 core/stuff/solver_* 타깃에 강제; `-fexceptions` + `-sDISABLE_EXCEPTION_CATCHING=0` | Phase G에서 그대로 재사용 (`wasm-src/CMakeLists.txt` 참조) |
 | 2026-04-18 | **Sophus는 스파이크에 불필요**: SE(3) 정점은 `Eigen::Isometry3d`와 `Eigen::AngleAxisd` 기반으로 직접 구현 | Sophus 최신판 C++17 호환성 이슈 선행 검증 불필요했음 (BA·PnP 모두 성공) | Phase B+에서 myslam 본체를 이식할 때 Sophus 선택 여부를 재판단. 대안: 계속 Isometry3d로 통일 |
 | 2026-04-18 | **Eigen 벤더링**: Homebrew 의존을 제거하고 `ch13-wasm/wasm-src/third_party/eigen/`에 submodule(tag **5.0.1**) 추가, `CMakeLists.txt`에서 `add_subdirectory(third_party/eigen) + EIGEN_BUILD_CMAKE_PACKAGE=ON + Eigen3_DIR → 빌드 트리` 패턴으로 g2o의 `find_package(Eigen3 NO_MODULE)` 충족 | 이식성(Linux CI / 새 맥 환경)과 재현성(버전 핀) 확보. PLAN.md §2 디렉터리 구조의 원안과 일치. g2o submodule과 동일한 패턴이라 유지보수 일관성 | 동일 수치로 PnP/BA gate 재통과(`verify_pnp.mjs`, `verify_ba.mjs`). 이후 Sophus/OpenCV-minimal/CXSparse 벤더링 시에도 동일 패턴 사용. `export(PACKAGE Eigen3)` 부작용은 `CMAKE_EXPORT_NO_PACKAGE_REGISTRY=ON`으로 차단 |
+| 2026-04-25 | **KITTI mini fixture 합성**: 실제 KITTI EULA 데이터 대신 `scripts/gen-kitti-mini.ts`가 결정론적으로 `calib.txt`(real KITTI 05 P0..P3) + 5프레임 1226×370 회색조 PNG(checkerboard + 앵커 마커)를 생성. Node 내장 zlib + 자체 CRC32 + PNG 인코더로 외부 의존 없음 | ① PLAN §8의 "KITTI 05 처음 10프레임" 의도는 유지하되, EULA 배포 문제와 네트워크 의존을 회피 ② 실 시퀀스가 준비되면 동일 경로 `public/datasets/kitti05-mini/`로 드롭인 교체 가능 | Phase C 이후에도 동일 fixture 사용. 프로덕션 데모 시 실 KITTI 교체를 위해 경로 규약 유지 |
+| 2026-04-25 | **TS 빌드 체인 보강**: tsconfig를 project references(`tsconfig.app.json` / `tsconfig.node.json`)로 분리하고 `@types/node` devDep 추가. 데이터셋 생성기는 Node 22.15의 `--experimental-strip-types`로 실행(별도 트랜스파일러 불필요) | src(DOM) / scripts(Node) 타입 오염 방지. `tsx`/`ts-node` 도입 없이 TS 스크립팅 가능 | 이후 모든 Node 측 도구 스크립트도 `scripts/**/*.ts` + `node --experimental-strip-types` 패턴으로 통일 |
+| 2026-04-25 | **Step 2 Camera 바인딩 범위 축소**: 원본 ch13 Camera의 전체 SE(3) pose 대신 pure translation extrinsic만 노출 (`Camera(fx,fy,cx,cy,baseline,tx,ty,tz)`). 회전 및 `T_c_w` 통합은 Phase E로 지연 | Step 2의 학습 목표(핀홀 투영/역투영)에 Sophus 의존은 과한 도입. KITTI 정류 스테레오 쌍은 회전이 단위라 pure translation만으로 원본 수치(P1 baseline ≈ 0.537 m)를 재현 가능 | WASM 바이너리 18 KB 로 유지 (Eigen/Sophus 불필요). Phase E에서 `bind_camera.cpp`를 확장하거나 별도 `bind_se3.cpp`로 분리할지 재결정 |
+| 2026-04-25 | **런타임 상태 관리**: `@tanstack/react-query` 도입 — calib.txt 파싱, 이미지 로드, WASM 모듈 로드를 모두 `useQuery`로 통일 | useEffect + useState 기반 수동 로더는 cancel/race/cache-key 처리 누락이 반복 발생. React Query는 staleTime=∞로 설정해 fixtures에 맞춤 | Phase C 이후 feature detection / LK 같은 중-빈도 연산도 useQuery + queryKey 기반 캐싱 규약으로 통일 |
 | _(미정)_ | OpenCV.js 커스텀 빌드 범위 | 번들 크기·기능 요구 | 초기 로드 크기 |
 
 ---
@@ -96,13 +102,19 @@
 - 원본 분석: `docs/analysis/2026-04-17-ch13-full-analysis.md`
 - 원본 C++ 코드: `ch13/`
 - WASM 프로젝트 루트: `ch13-wasm/` ✅
-  - React/TS 앱: `ch13-wasm/src/` (router, App shell, Home, StepLayout, ParamPanel, PerfMeter, VerifyGate, Zustand stores)
+  - React/TS 앱: `ch13-wasm/src/` (router, App shell, Home, StepLayout, ParamPanel, PerfMeter, VerifyGate, Zustand stores, React Query Provider)
+  - Step 1/2 구현: `ch13-wasm/src/steps/Step01_Dataset/`, `ch13-wasm/src/steps/Step02_Camera/`
+  - KITTI 파서: `ch13-wasm/src/lib/kitti.ts`
+  - WASM 로더: `ch13-wasm/src/wasm/{loader.ts, camera.ts}`
+  - KITTI mini fixture: `ch13-wasm/public/datasets/kitti05-mini/{calib.txt, image_{0,1}/00000{0..4}.png}` — `npm run gen:dataset`로 재생성 가능
+  - 데이터셋 생성기: `ch13-wasm/scripts/gen-kitti-mini.ts`
   - WASM hello 소스: `ch13-wasm/wasm-src/myslam/bindings/bind_hello.cpp`
+  - WASM Camera 바인딩: `ch13-wasm/wasm-src/myslam/bindings/bind_camera.cpp`
   - Phase A+ 스파이크: `ch13-wasm/wasm-src/spike/{bind_pnp_spike.cpp, bind_ba_spike.cpp, verify_pnp.mjs, verify_ba.mjs, verify_pnp_diag*.mjs}`
-  - 빌드 스크립트: `ch13-wasm/wasm-src/{CMakeLists.txt, build.sh}` — `bash build.sh [baseline|simd|mt|mt-simd] [hello|pnp_spike|ba_spike]`
+  - 빌드 스크립트: `ch13-wasm/wasm-src/{CMakeLists.txt, build.sh}` — `bash build.sh [baseline|simd|mt|mt-simd] [hello|camera|pnp_spike|ba_spike]`
   - g2o submodule (modern master): `ch13-wasm/wasm-src/third_party/g2o/`
   - Eigen submodule (tag 5.0.1): `ch13-wasm/wasm-src/third_party/eigen/`
-  - 빌드 산출물: `ch13-wasm/public/wasm/myslam_{hello,pnp_spike,ba_spike}.<variant>.{js,wasm}`
+  - 빌드 산출물: `ch13-wasm/public/wasm/myslam_{hello,camera,pnp_spike,ba_spike}.<variant>.{js,wasm}`
 - (예정) 단계별 학습 노트: `docs/steps/NN-*.md`
 
 ---
@@ -164,6 +176,47 @@
 - **결과**: ✅ **g2o 경로 유지** — PLAN.md §9 Phase A+ Gate 조건의 "성공" 분기.
 - **근거**: Emscripten에서 g2o core + Eigen + dense/sparse 선형 솔버가 빌드·링크·수렴. Stage 2는 CXSparse를 solver_eigen으로 대체했으나 gate의 본질 질문("g2o 기반 sparse BA가 WASM에서 동작")은 답변됨.
 - **남은 열린 질문**: CXSparse 자체의 Emscripten 빌드는 미검증 — Phase G 성능 측정 후 재평가.
+
+---
+
+## Phase B 완료 체크리스트 (2026-04-25)
+
+### Step 1 — Dataset Loader (KITTI mini)
+
+- [x] `scripts/gen-kitti-mini.ts` (TS, Node 22 `--experimental-strip-types`) — real KITTI 05 P0..P3 calib + 5 × 1226×370 회색조 PNG pair, 외부 의존 없이 결정론적 생성
+- [x] fixture 위치: `ch13-wasm/public/datasets/kitti05-mini/{calib.txt, image_{0,1}/00000{0..4}.png}`
+- [x] TS 파서 `src/lib/kitti.ts` — `parseKittiCalib(text, downsample)` + `loadKittiFrame(dir, idx, downsample)`. 내부 K⁻¹ · last_col로 t 추출, baseline = ||t||, downsample은 fx/fy/cx/cy 일괄 스케일
+- [x] Node 수치 검증: P1 baseline = 0.537151 m (expected |P1[0,3]|/fx와 일치, ≤ 1e-6)
+- [x] `src/steps/Step01_Dataset/` UI — frame index slider (0..4), downsample toggle (0.25/0.5/1×), 좌/우 canvas 렌더, P0~P3 카드에 fx/fy/cx/cy/t/K/baseline 표시
+- [x] `@tanstack/react-query` 도입해 calib/frame 로딩 useQuery 통일 (main.tsx에 `QueryClientProvider` 추가)
+- [x] VerifyGate 자동 통과 (체크리스트 5건: calib parsed · baseline>0 · frame loaded · L/R dims match · downsample applied)
+
+### Step 2 — Camera Model
+
+- [x] `wasm-src/myslam/bindings/bind_camera.cpp` — header-only Camera(`fx,fy,cx,cy,baseline,tx,ty,tz`) + `cameraToPixel`/`pixelToCamera`/`worldToPixel`/`pixelToWorld` + `projectBatch`/`roundTripMaxError` (Embind)
+- [x] CMake 타깃 `camera` 추가 — `bash wasm-src/build.sh baseline camera` → `public/wasm/myslam_camera.baseline.{js,wasm}` (18 KB wasm, 47 KB js)
+- [x] TS 로더 `src/wasm/camera.ts` — `loadCameraWasm('baseline')` 반환 타입 `CameraModule`·`CameraHandle`
+- [x] Node 수치 검증: 20-point random grid round-trip maxErr = **1.06e-15** (machine precision, 임계 1e-5 충분)
+- [x] `src/steps/Step02_Camera/` UI — fx/fy/cx/cy slider(KITTI 05 0.5× 기본), 3D test point slider, P0/P1 extrinsic 선택, 현재 점과 60-point 그리드 round-trip 오차 실시간 표시
+- [x] VerifyGate 자동 통과 (체크리스트 4건: wasm loaded · 60-point grid error < 1e-5 · current-point round-trip · stereo extrinsic t 일치)
+
+### 헤드리스 검증 기록 (2026-04-25)
+
+| 항목 | 관측값 |
+|------|--------|
+| `GET /` | `200 text/html` |
+| `GET /step/dataset`, `/step/camera` | 각각 `200 text/html` (SPA fallback 정상) |
+| `GET /datasets/kitti05-mini/calib.txt` | `200 text/plain` (930 B) |
+| `GET /datasets/kitti05-mini/image_0/000000.png` | `200 image/png` (12 699 B) |
+| `GET /datasets/kitti05-mini/image_1/000004.png` | `200 image/png` (12 750 B) |
+| `GET /wasm/myslam_camera.baseline.js` | `200 text/javascript` (47 158 B) |
+| `GET /wasm/myslam_camera.baseline.wasm` | `200 application/wasm` (18 310 B), COEP/COOP 동일 반영 |
+| `npm run build` | ✅ tsc -b clean + vite build — `dist/assets/index-*.js` = 272.11 KB (gzip **88.39 KB**, PLAN §10 ≤ 400 KB 충족) |
+
+### 남은 사용자 육안 관측
+
+- [ ] `http://localhost:5173/step/dataset`: 좌/우 체커보드 이미지에 스테레오 disparity(우측 이미지가 좌측보다 좌로 ~22 px 이동)가 보이는지 확인
+- [ ] `http://localhost:5173/step/camera`: 슬라이더를 움직여도 "60-point grid max error" 표시값이 1e-13 수준에 머무는지 확인, P0→P1 전환 시 extrinsic t가 [0,0,0] → [-0.5372,0,0]으로 바뀌는지 확인
 
 ---
 

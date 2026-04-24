@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Build a single WASM variant. Usage:
-#   bash wasm-src/build.sh [baseline|simd|mt|mt-simd] [hello|pnp_spike]
+#   bash wasm-src/build.sh [baseline|simd|mt|mt-simd] [hello|camera|pnp_spike|ba_spike]
 set -euo pipefail
 
 VARIANT="${1:-baseline}"
@@ -44,6 +44,7 @@ emcmake cmake -S "$SCRIPT_DIR" -B "$BUILD_DIR" \
 
 case "$TARGET" in
   hello)      BUILD_TGT="myslam_hello"      ; OUT_BASE="myslam_hello.$VARIANT"      ;;
+  camera)     BUILD_TGT="myslam_camera"     ; OUT_BASE="myslam_camera.$VARIANT"     ;;
   pnp_spike)  BUILD_TGT="myslam_pnp_spike"  ; OUT_BASE="myslam_pnp_spike.$VARIANT"  ;;
   ba_spike)   BUILD_TGT="myslam_ba_spike"   ; OUT_BASE="myslam_ba_spike.$VARIANT"   ;;
   *) echo "unknown target: $TARGET" >&2; exit 1 ;;
