@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Build a single WASM variant. Usage:
-#   bash wasm-src/build.sh [baseline|simd|mt|mt-simd] [hello|camera|pnp_spike|ba_spike]
+#   bash wasm-src/build.sh [baseline|simd|mt|mt-simd] [hello|camera|pnp_spike|ba_spike|cv_spike]
+# Note: cv_spike requires the OpenCV sub-build to have completed first
+#   (bash wasm-src/scripts/build-opencv.sh <variant>).
 set -euo pipefail
 
 VARIANT="${1:-baseline}"
@@ -47,6 +49,7 @@ case "$TARGET" in
   camera)     BUILD_TGT="myslam_camera"     ; OUT_BASE="myslam_camera.$VARIANT"     ;;
   pnp_spike)  BUILD_TGT="myslam_pnp_spike"  ; OUT_BASE="myslam_pnp_spike.$VARIANT"  ;;
   ba_spike)   BUILD_TGT="myslam_ba_spike"   ; OUT_BASE="myslam_ba_spike.$VARIANT"   ;;
+  cv_spike)   BUILD_TGT="myslam_cv_spike"   ; OUT_BASE="myslam_cv_spike.$VARIANT"   ;;
   *) echo "unknown target: $TARGET" >&2; exit 1 ;;
 esac
 

@@ -22,3 +22,7 @@
 [submodule "ch13-wasm/wasm-src/third_party/eigen"]
 	path = ch13-wasm/wasm-src/third_party/eigen
 	url = https://gitlab.com/libeigen/eigen.git
+[submodule "ch13-wasm/wasm-src/third_party/opencv"]
+	path = ch13-wasm/wasm-src/third_party/opencv
+	url = https://github.com/opencv/opencv.git
+	shallow = true

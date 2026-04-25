@@ -12,6 +12,9 @@
     "build:wasm:mt": "bash wasm-src/build.sh mt",
     "build:wasm:mt-simd": "bash wasm-src/build.sh mt-simd",
     "build:wasm:camera": "bash wasm-src/build.sh baseline camera",
+    "build:opencv:baseline": "bash wasm-src/scripts/build-opencv.sh baseline",
+    "build:wasm:cv_spike": "bash wasm-src/build.sh baseline cv_spike",
+    "verify:cv_spike": "node --experimental-strip-types wasm-src/spike/verify_cv.ts",
     "gen:dataset": "node --experimental-strip-types scripts/gen-kitti-mini.ts"
   },
   "dependencies": {

@@ -5,7 +5,7 @@
 
 - **시작일**: 2026-04-17
 - **최근 갱신**: 2026-04-26
-- **현재 진행 중**: **Phase C 결정 체크포인트** — 백엔드 경로로 **OpenCV 4.13 분리 빌드 + static lib 링크(B′)** 채택. 코드 작업 전, 구현 전에 OpenCV 빌드 spike (Q1~Q4) 통과 게이트 필요. 자세한 내용은 아래 "Phase C — 착수 계획 (2026-04-26)" 섹션 참조
+- **현재 진행 중**: **Phase C 본 작업** — 게이트 spike(Q1~Q4) 통과(2026-04-26). 다음: `bind_features.cpp` + Step 3/4 UI(AlgoPicker, GFTT/Harris/FAST/ORB + LK 트랙). 자세한 내용은 아래 "Phase C — 게이트 spike 결과" 섹션 참조
 
 ---
 
@@ -20,8 +20,9 @@
 | g2o WASM 스파이크 (Phase A+) | ✅ 2026-04-18 gate 통과 (Stage 1 PnP + Stage 2 BA 모두 수치 검증). CXSparse는 별도 open 질문으로 남김 |
 | Phase B Step 1 (Dataset Loader) | ✅ 2026-04-25 — KITTI 05 calib 파싱 + 5프레임 mini fixture + 좌/우 이미지 렌더링, 자동 verify gate 통과 |
 | Phase B Step 2 (Camera Model) | ✅ 2026-04-25 — WASM Camera 바인딩 round-trip 오차 1.06e-15 (60-point 그리드 기준, 임계 1e-5) |
+| Phase C 게이트 spike (Q1~Q4) | ✅ 2026-04-26 — OpenCV 4.13.0 분리 빌드 + cv_spike 단일 myslam.wasm 통합 + GFTT 200/200 + LK 100% (mean dx = −14.00 px) |
 | 현재 브랜치 | `ex` |
-| 마지막 커밋 | `ad45a65` (fm) → 본 Phase B 커밋 예정 |
+| 마지막 커밋 | `25076f3` (Phase C 백엔드 경로 결정) → 본 spike 커밋 예정 |
 
 ---
 
@@ -33,6 +34,9 @@
   - Open follow-up: CXSparse 자체의 Emscripten 빌드는 미검증 — Phase G에서 성능이 부족하면 그때 통합 재평가
 - [x] **Phase B** — Step 1~2 Dataset + Camera ← 2026-04-25 완료
 - [ ] **Phase C** — Step 3~4 Feature Detection + Stereo LK
+  - [x] 게이트 spike(Q1~Q4) ← 2026-04-26 통과 (OpenCV 4.13.0 분리 빌드 → static lib → find_package → cv::goodFeaturesToTrack + cv::calcOpticalFlowPyrLK 검증)
+  - [ ] Step 3 본 작업 — `bind_features.cpp`, AlgoPicker(GFTT/Harris/FAST/ORB), Step3 UI
+  - [ ] Step 4 본 작업 — LK 좌→우 매칭, Step4 UI
 - [ ] **Phase D** — Step 5~6 Triangulation + Initial Map
 - [ ] **Phase E** — Step 7~8 Frame Tracking + PnP
 - [ ] **Phase F** — Step 9~10 Keyframe + New MapPoints
@@ -83,6 +87,10 @@
 | 2026-04-25 | **Step 2 Camera 바인딩 범위 축소**: 원본 ch13 Camera의 전체 SE(3) pose 대신 pure translation extrinsic만 노출 (`Camera(fx,fy,cx,cy,baseline,tx,ty,tz)`). 회전 및 `T_c_w` 통합은 Phase E로 지연 | Step 2의 학습 목표(핀홀 투영/역투영)에 Sophus 의존은 과한 도입. KITTI 정류 스테레오 쌍은 회전이 단위라 pure translation만으로 원본 수치(P1 baseline ≈ 0.537 m)를 재현 가능 | WASM 바이너리 18 KB 로 유지 (Eigen/Sophus 불필요). Phase E에서 `bind_camera.cpp`를 확장하거나 별도 `bind_se3.cpp`로 분리할지 재결정 |
 | 2026-04-25 | **런타임 상태 관리**: `@tanstack/react-query` 도입 — calib.txt 파싱, 이미지 로드, WASM 모듈 로드를 모두 `useQuery`로 통일 | useEffect + useState 기반 수동 로더는 cancel/race/cache-key 처리 누락이 반복 발생. React Query는 staleTime=∞로 설정해 fixtures에 맞춤 | Phase C 이후 feature detection / LK 같은 중-빈도 연산도 useQuery + queryKey 기반 캐싱 규약으로 통일 |
 | 2026-04-26 | **Phase C 백엔드 경로: OpenCV 4.13 분리 빌드 + static lib 링크 (B′)** 채택 — `add_subdirectory(opencv)`(B), OpenCV.js 별도 런타임(A), 순수 C++ 자체 구현(C)을 모두 검토 후 선택 | (1) PLAN §1.3의 "OpenCV.js 4.10+ 커스텀 빌드"의 정신("ch13의 OpenCV 의존을 WASM에서 살리되 모듈 최소화")을 가장 충실히 구현. (2) 순수 add_subdirectory(B)는 OpenCV 4.13에서도 미지원 — issue [#27548](https://github.com/opencv/opencv/issues/27548) 2025-07 제기 후 9개월째 open. 4.x CMakeLists의 `${CMAKE_SOURCE_DIR}/modules/...` 절대경로 참조가 사용자 top-level project를 가리켜 깨짐. 비슷한 #26955도 open. (3) 그러나 BUILD_LIST + CV_DISABLE_OPTIMIZATION + WITH_*=OFF 단일 플래그로 모듈/SIMD/I-O 코덱 깔끔히 차단 가능 — 처음 우려했던 "per-arch SIMD 디스에이블 노가다"는 사실 단일 옵션으로 해결. (4) A안(OpenCV.js 별도)은 두 WASM HEAP 분리, .delete() 위생 부담, mt variant 워커 풀 분리 등 운영 복잡도 ↑ (sparse 점 데이터 cross-runtime 비용 자체는 ~2-3 ms/frame로 미미함을 확인). (5) C안(순수 자체 구현)은 학습 가치 높지만 FAST/ORB까지 작성 시 ch13 책 API와 수치적으로 어긋날 위험 + 향후 cv::solvePnPRansac 같은 Step 8 대체 알고리즘 도입 시 다시 OpenCV 재도입 필요. (6) **B′은 Phase A+ g2o 스파이크와 같은 정신**: 분리 빌드 + cmake에서 `find_package(OpenCV PATHS ... NO_DEFAULT_PATH)` — 이미 입증된 패턴 | Phase C 본 작업 전에 **spike(Q1~Q4) 통과 게이트** 필수. OpenCV submodule pin은 **tag 4.13.0**(2025-12-31, latest stable). 5.x는 alpha라 미채택. spike 결과에 따라 본 작업 ETA 1.5주~2주 예상. 향후 Step 8 PnP에서 calib3d 모듈을 BUILD_LIST에 추가하기만 하면 cv::solvePnPRansac 대체 알고리즘 가능 |
+| 2026-04-26 | **OpenCV submodule shallow clone**: `git clone --depth 1 --branch 4.13.0 …`로 받고 `.gitmodules`에 `shallow = true` 명시 | OpenCV 풀 히스토리는 ~700 MB / 25 GB 잔여 디스크에서 부담. 단일 태그만 필요하므로 shallow 만으로 충분 | repo 추가 디스크 309 MB. 향후 4.13.x 패치로 올릴 때는 `git fetch --depth 1 origin tag <new>` 후 checkout |
+| 2026-04-26 | **OpenCV CMake 통합 — `OpenCV_DIR` 직접 지정**: `find_package(OpenCV ... PATHS … NO_DEFAULT_PATH)`만으로는 `lib/cmake/opencv4/`의 `OpenCVConfig.cmake`를 매칭하지 못함 | 패키지 이름(`OpenCV`)과 디렉터리 이름(`opencv4`)이 case-insensitive로도 어긋남. CMake 3.20 기준 검증된 동작 | `set(OpenCV_DIR "${prefix}/lib/cmake/opencv4" CACHE PATH "" FORCE)` 후 `find_package(OpenCV 4.13 REQUIRED COMPONENTS … NO_DEFAULT_PATH)` 패턴으로 픽스. 향후 contrib 통합 시에도 동일 |
+| 2026-04-26 | **`-fexceptions` + `DISABLE_EXCEPTION_CATCHING=0`을 `cv_spike` 타깃에 한정**(g2o spike 패턴 확장 X) | OpenCV는 `cv::Exception` throw, g2o spike도 마찬가지지만 `hello`/`camera`처럼 예외 없는 타깃은 zero-cost. PLAN §10 번들 가드 유지 | Step 3/4 본 바인딩(`bind_features.cpp`)에서 동일 플래그를 자기 타깃에만 추가 |
+| 2026-04-26 | **TS 우선 규칙(memory도 갱신)**: 스파이크 검증 스크립트는 `wasm-src/spike/verify_cv.ts` + `node --experimental-strip-types` | `verify_pnp.mjs`/`verify_ba.mjs`(2026-04-18 작성)는 그대로 두되 신규 Node 스크립트는 모두 TS. `tsconfig.node.json` include에 `wasm-src/spike/**/*.ts` 추가 — `@types/node` 자동 적용 | 사용자 명시 피드백(2026-04-26): "please use typescript whenever possible". memory `feedback_typescript_default.md` 참조 |
 | _(미정)_ | OpenCV submodule 채택 시 contrib(SIFT/AKAZE)까지 포함할지 여부 | features2d만으로 GFTT/Harris/FAST/ORB 충족 — contrib는 Step 11 BA·Loop closure 시점에 재평가 | 번들 크기 |
 
 ---
@@ -112,10 +120,14 @@
   - WASM hello 소스: `ch13-wasm/wasm-src/myslam/bindings/bind_hello.cpp`
   - WASM Camera 바인딩: `ch13-wasm/wasm-src/myslam/bindings/bind_camera.cpp`
   - Phase A+ 스파이크: `ch13-wasm/wasm-src/spike/{bind_pnp_spike.cpp, bind_ba_spike.cpp, verify_pnp.mjs, verify_ba.mjs, verify_pnp_diag*.mjs}`
-  - 빌드 스크립트: `ch13-wasm/wasm-src/{CMakeLists.txt, build.sh}` — `bash build.sh [baseline|simd|mt|mt-simd] [hello|camera|pnp_spike|ba_spike]`
+  - Phase C 게이트 스파이크: `ch13-wasm/wasm-src/spike/{bind_cv_spike.cpp, verify_cv.ts}` — `npm run verify:cv_spike`
+  - 빌드 스크립트: `ch13-wasm/wasm-src/{CMakeLists.txt, build.sh}` — `bash build.sh [baseline|simd|mt|mt-simd] [hello|camera|pnp_spike|ba_spike|cv_spike]`
+  - OpenCV 분리 빌드 스크립트: `ch13-wasm/wasm-src/scripts/build-opencv.sh` — `npm run build:opencv:baseline`
   - g2o submodule (modern master): `ch13-wasm/wasm-src/third_party/g2o/`
   - Eigen submodule (tag 5.0.1): `ch13-wasm/wasm-src/third_party/eigen/`
-  - 빌드 산출물: `ch13-wasm/public/wasm/myslam_{hello,camera,pnp_spike,ba_spike}.<variant>.{js,wasm}`
+  - OpenCV submodule (tag 4.13.0, shallow): `ch13-wasm/wasm-src/third_party/opencv/`
+  - OpenCV 빌드 산출물: `ch13-wasm/wasm-src/build/opencv-{build,install}-<variant>/` (gitignored). install/lib에 `libopencv_{core,imgproc,features2d,video}.a`
+  - 빌드 산출물: `ch13-wasm/public/wasm/myslam_{hello,camera,pnp_spike,ba_spike,cv_spike}.<variant>.{js,wasm}`
 - (예정) 단계별 학습 노트: `docs/steps/NN-*.md`
 
 ---
@@ -218,6 +230,37 @@
 
 - [x] `http://localhost:5173/step/dataset`: 좌/우 체커보드 이미지에 스테레오 disparity(우측 이미지가 좌측보다 좌로 ~22 px 이동)가 보이는지 확인
 - [x] `http://localhost:5173/step/camera`: 슬라이더를 움직여도 "60-point grid max error" 표시값이 1e-13 수준에 머무는지 확인, P0→P1 전환 시 extrinsic t가 [0,0,0] → [-0.5372,0,0]으로 바뀌는지 확인
+
+---
+
+## Phase C — 게이트 spike 결과 (2026-04-26)
+
+### 결과: ✅ 4개 게이트 모두 통과 → 본 작업 착수 승인
+
+`npm run build:opencv:baseline && npm run build:wasm:cv_spike && npm run verify:cv_spike` 한 줄 흐름으로 재현 가능.
+
+| Q | 질문 | 결과 |
+|---|------|------|
+| Q1 | OpenCV 4.13.0 submodule이 emcc + `BUILD_LIST=core,imgproc,features2d,video` + disable 플래그 조합으로 빌드되는가? | ✅ Configure 135.7s + Build ~5분. `wasm-src/scripts/build-opencv.sh baseline` 단일 실행 |
+| Q2 | static `.a` + 헤더가 install prefix에 떨어지는가? | ✅ `lib/libopencv_{core,imgproc,features2d,video}.a` (총 8.1 MB) + `include/opencv4/opencv2/` + `lib/cmake/opencv4/OpenCVConfig.cmake` |
+| Q3 | top-level CMakeLists에서 `find_package(OpenCV)`로 detect되고 `cv_spike` 타깃에 링크되는가? | ✅ `OpenCV_DIR`을 `lib/cmake/opencv4`에 직접 set 후 `find_package(... NO_DEFAULT_PATH)`로 픽스. 단일 `myslam_cv_spike.baseline.wasm` 750 KB(g2o 스파이크 대비 +약 2배 — 합리적) |
+| Q4 | KITTI mini frame 0/1에서 GFTT + LK가 합리적 결과를 내는가? | ✅ GFTT 200 corners(요청 200, 100% saturate), LK 200/200 tracked, **mean dx = −14.00 px / dy = −0.00 px** (예상 forwardShift = −14 px, dy = 0 정확 일치) |
+
+### 본 작업 착수 시 재사용할 패턴
+
+1. `bind_features.cpp`는 `bind_cv_spike.cpp`의 detectGFTT/trackLK API를 확장 — 알고리즘 enum(GFTT/Harris/FAST/ORB), 옵션 객체, 마스크 인자 추가.
+2. CMake 통합: cv_spike 타깃이 사용한 `set(OpenCV_DIR …)` + `find_package(OpenCV 4.13 REQUIRED COMPONENTS … NO_DEFAULT_PATH)` + `target_link_libraries(... ${OpenCV_LIBS})` + `-fexceptions/-sDISABLE_EXCEPTION_CATCHING=0`을 그대로 새 타깃에 복제.
+3. SIMD/MT variant 빌드는 `build-opencv.sh simd` 등을 추가 호출해 `opencv-install-simd/`를 만들고 `CH13_WASM_VARIANT=simd`로 상위 빌드. **현재 spike에서는 baseline만 검증** — Phase C+ 또는 Phase G에서 일괄 도입.
+
+### 디스크 footprint (참고)
+
+| 디렉토리 | 크기 |
+|----------|------|
+| `wasm-src/third_party/opencv/` (shallow 4.13.0) | 309 MB |
+| `wasm-src/build/opencv-build-baseline/` (gitignored) | 37 MB |
+| `wasm-src/build/opencv-install-baseline/` (gitignored) | 22 MB |
+| `wasm-src/build/cv_spike_baseline/` (gitignored) | 1.1 MB |
+| `public/wasm/myslam_cv_spike.baseline.{js,wasm}` | 87 KB + 750 KB |
 
 ---
 

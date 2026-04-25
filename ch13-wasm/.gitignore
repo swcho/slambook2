@@ -13,6 +13,8 @@ wasm-src/build/
 # Re-include: the repo-root .gitignore has a broad `**build**` glob that
 # otherwise swallows build.sh. (wasm-src/build/ above still ignores the dir.)
 !wasm-src/build.sh
+!wasm-src/scripts/
+!wasm-src/scripts/build-opencv.sh
 
 
 # emsdk / third-party (if vendored later as plain copies, not submodules)
@@ -20,4 +22,4 @@ wasm-src/third_party/emsdk/
 wasm-src/third_party/sophus/
 wasm-src/third_party/opencv-minimal/
 wasm-src/third_party/cxsparse/
-# g2o and eigen live here as git submodules (see .gitmodules) — explicitly tracked.
+# g2o, eigen, and opencv live here as git submodules (see .gitmodules) — explicitly tracked.

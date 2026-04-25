@@ -217,3 +217,58 @@ if(CH13_WASM_TARGET STREQUAL "pnp_spike" OR CH13_WASM_TARGET STREQUAL "ba_spike"
       "core;stuff;solver_eigen")
   endif()
 endif()
+
+# -----------------------------------------------------------------------------
+# Target: cv_spike (Phase C gate) — minimal OpenCV smoke test.
+#
+# Consumes the pre-built static OpenCV (BUILD_LIST=core,imgproc,features2d,video)
+# produced by `bash wasm-src/scripts/build-opencv.sh ${CH13_WASM_VARIANT}`.
+# This is the B′ path: OpenCV is a separate sub-build that emits .a libs into
+# build/opencv-install-${variant}/, and this top-level CMake imports them
+# via find_package(OpenCV ... NO_DEFAULT_PATH). Once the spike passes, the
+# real Step 3/4 binding (bind_features.cpp) reuses the same find_package +
+# target_link_libraries pattern.
+# -----------------------------------------------------------------------------
+if(CH13_WASM_TARGET STREQUAL "cv_spike")
+  set(_opencv_install
+    "${CMAKE_CURRENT_SOURCE_DIR}/build/opencv-install-${CH13_WASM_VARIANT}")
+  if(NOT EXISTS "${_opencv_install}/lib/cmake/opencv4/OpenCVConfig.cmake")
+    message(FATAL_ERROR
+      "OpenCV install not found at ${_opencv_install}. "
+      "Run: bash wasm-src/scripts/build-opencv.sh ${CH13_WASM_VARIANT}")
+  endif()
+
+  # OpenCV ships its CMake package as <prefix>/lib/cmake/opencv4/, but
+  # find_package's case-insensitive heuristic doesn't reliably match the
+  # `opencv4` dir to the package name `OpenCV` across CMake versions, so
+  # point OpenCV_DIR at the config dir directly.
+  set(OpenCV_DIR "${_opencv_install}/lib/cmake/opencv4" CACHE PATH "" FORCE)
+  find_package(OpenCV 4.13 REQUIRED
+    COMPONENTS core imgproc features2d video
+    NO_DEFAULT_PATH)
+  message(STATUS "[ch13-wasm] OpenCV ${OpenCV_VERSION} from ${OpenCV_DIR}")
+
+  add_executable(myslam_cv_spike spike/bind_cv_spike.cpp)
+  target_compile_options(myslam_cv_spike PRIVATE -O3 ${VARIANT_FLAGS})
+  # OpenCV throws cv::Exception, so we need exception support like the g2o
+  # spikes. Keep this scoped to this target so other targets stay lean.
+  target_compile_options(myslam_cv_spike PRIVATE -fexceptions)
+  target_link_options(myslam_cv_spike PRIVATE
+    -O3 --bind
+    -fexceptions
+    -sDISABLE_EXCEPTION_CATCHING=0
+    -sMODULARIZE=1
+    -sEXPORT_ES6=1
+    -sEXPORT_NAME=createCvSpikeModule
+    -sALLOW_MEMORY_GROWTH=1
+    -sENVIRONMENT=web,worker,node
+    -sWASM=1
+    ${VARIANT_LINK}
+  )
+  target_link_libraries(myslam_cv_spike PRIVATE ${OpenCV_LIBS})
+
+  set_target_properties(myslam_cv_spike PROPERTIES
+    OUTPUT_NAME "myslam_cv_spike.${CH13_WASM_VARIANT}"
+    SUFFIX ".js"
+  )
+endif()
