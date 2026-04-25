@@ -4,8 +4,8 @@
 각 Phase/Step 종료 시 이 파일을 반드시 갱신하고 커밋해야 새 세션이 상태를 복원할 수 있다.
 
 - **시작일**: 2026-04-17
-- **최근 갱신**: 2026-04-25
-- **현재 진행 중**: — (Phase B **완료**. Step 1 Dataset Loader + Step 2 Camera Model 게이트 통과. 다음 세션은 **Phase C — Feature Detection + Stereo LK** 착수)
+- **최근 갱신**: 2026-04-26
+- **현재 진행 중**: **Phase C 결정 체크포인트** — 백엔드 경로로 **OpenCV 4.13 분리 빌드 + static lib 링크(B′)** 채택. 코드 작업 전, 구현 전에 OpenCV 빌드 spike (Q1~Q4) 통과 게이트 필요. 자세한 내용은 아래 "Phase C — 착수 계획 (2026-04-26)" 섹션 참조
 
 ---
 
@@ -82,7 +82,8 @@
 | 2026-04-25 | **TS 빌드 체인 보강**: tsconfig를 project references(`tsconfig.app.json` / `tsconfig.node.json`)로 분리하고 `@types/node` devDep 추가. 데이터셋 생성기는 Node 22.15의 `--experimental-strip-types`로 실행(별도 트랜스파일러 불필요) | src(DOM) / scripts(Node) 타입 오염 방지. `tsx`/`ts-node` 도입 없이 TS 스크립팅 가능 | 이후 모든 Node 측 도구 스크립트도 `scripts/**/*.ts` + `node --experimental-strip-types` 패턴으로 통일 |
 | 2026-04-25 | **Step 2 Camera 바인딩 범위 축소**: 원본 ch13 Camera의 전체 SE(3) pose 대신 pure translation extrinsic만 노출 (`Camera(fx,fy,cx,cy,baseline,tx,ty,tz)`). 회전 및 `T_c_w` 통합은 Phase E로 지연 | Step 2의 학습 목표(핀홀 투영/역투영)에 Sophus 의존은 과한 도입. KITTI 정류 스테레오 쌍은 회전이 단위라 pure translation만으로 원본 수치(P1 baseline ≈ 0.537 m)를 재현 가능 | WASM 바이너리 18 KB 로 유지 (Eigen/Sophus 불필요). Phase E에서 `bind_camera.cpp`를 확장하거나 별도 `bind_se3.cpp`로 분리할지 재결정 |
 | 2026-04-25 | **런타임 상태 관리**: `@tanstack/react-query` 도입 — calib.txt 파싱, 이미지 로드, WASM 모듈 로드를 모두 `useQuery`로 통일 | useEffect + useState 기반 수동 로더는 cancel/race/cache-key 처리 누락이 반복 발생. React Query는 staleTime=∞로 설정해 fixtures에 맞춤 | Phase C 이후 feature detection / LK 같은 중-빈도 연산도 useQuery + queryKey 기반 캐싱 규약으로 통일 |
-| _(미정)_ | OpenCV.js 커스텀 빌드 범위 | 번들 크기·기능 요구 | 초기 로드 크기 |
+| 2026-04-26 | **Phase C 백엔드 경로: OpenCV 4.13 분리 빌드 + static lib 링크 (B′)** 채택 — `add_subdirectory(opencv)`(B), OpenCV.js 별도 런타임(A), 순수 C++ 자체 구현(C)을 모두 검토 후 선택 | (1) PLAN §1.3의 "OpenCV.js 4.10+ 커스텀 빌드"의 정신("ch13의 OpenCV 의존을 WASM에서 살리되 모듈 최소화")을 가장 충실히 구현. (2) 순수 add_subdirectory(B)는 OpenCV 4.13에서도 미지원 — issue [#27548](https://github.com/opencv/opencv/issues/27548) 2025-07 제기 후 9개월째 open. 4.x CMakeLists의 `${CMAKE_SOURCE_DIR}/modules/...` 절대경로 참조가 사용자 top-level project를 가리켜 깨짐. 비슷한 #26955도 open. (3) 그러나 BUILD_LIST + CV_DISABLE_OPTIMIZATION + WITH_*=OFF 단일 플래그로 모듈/SIMD/I-O 코덱 깔끔히 차단 가능 — 처음 우려했던 "per-arch SIMD 디스에이블 노가다"는 사실 단일 옵션으로 해결. (4) A안(OpenCV.js 별도)은 두 WASM HEAP 분리, .delete() 위생 부담, mt variant 워커 풀 분리 등 운영 복잡도 ↑ (sparse 점 데이터 cross-runtime 비용 자체는 ~2-3 ms/frame로 미미함을 확인). (5) C안(순수 자체 구현)은 학습 가치 높지만 FAST/ORB까지 작성 시 ch13 책 API와 수치적으로 어긋날 위험 + 향후 cv::solvePnPRansac 같은 Step 8 대체 알고리즘 도입 시 다시 OpenCV 재도입 필요. (6) **B′은 Phase A+ g2o 스파이크와 같은 정신**: 분리 빌드 + cmake에서 `find_package(OpenCV PATHS ... NO_DEFAULT_PATH)` — 이미 입증된 패턴 | Phase C 본 작업 전에 **spike(Q1~Q4) 통과 게이트** 필수. OpenCV submodule pin은 **tag 4.13.0**(2025-12-31, latest stable). 5.x는 alpha라 미채택. spike 결과에 따라 본 작업 ETA 1.5주~2주 예상. 향후 Step 8 PnP에서 calib3d 모듈을 BUILD_LIST에 추가하기만 하면 cv::solvePnPRansac 대체 알고리즘 가능 |
+| _(미정)_ | OpenCV submodule 채택 시 contrib(SIFT/AKAZE)까지 포함할지 여부 | features2d만으로 GFTT/Harris/FAST/ORB 충족 — contrib는 Step 11 BA·Loop closure 시점에 재평가 | 번들 크기 |
 
 ---
 
@@ -215,8 +216,69 @@
 
 ### 남은 사용자 육안 관측
 
-- [ ] `http://localhost:5173/step/dataset`: 좌/우 체커보드 이미지에 스테레오 disparity(우측 이미지가 좌측보다 좌로 ~22 px 이동)가 보이는지 확인
-- [ ] `http://localhost:5173/step/camera`: 슬라이더를 움직여도 "60-point grid max error" 표시값이 1e-13 수준에 머무는지 확인, P0→P1 전환 시 extrinsic t가 [0,0,0] → [-0.5372,0,0]으로 바뀌는지 확인
+- [x] `http://localhost:5173/step/dataset`: 좌/우 체커보드 이미지에 스테레오 disparity(우측 이미지가 좌측보다 좌로 ~22 px 이동)가 보이는지 확인
+- [x] `http://localhost:5173/step/camera`: 슬라이더를 움직여도 "60-point grid max error" 표시값이 1e-13 수준에 머무는지 확인, P0→P1 전환 시 extrinsic t가 [0,0,0] → [-0.5372,0,0]으로 바뀌는지 확인
+
+---
+
+## Phase C — 착수 계획 (2026-04-26)
+
+### 채택 경로: **B′ — OpenCV 4.13 분리 빌드 + static lib 링크**
+
+본 Phase는 PLAN.md §9 Phase C("OpenCV.js minimal 빌드 + GFTT/LK + Harris/FAST/ORB + WebGL/WebGPU + MT/SIMD")의 1.5주 규모 작업이라 한 세션에 모두 다룰 수 없다. 백엔드 경로 결정과 Phase A+ 스타일 spike를 먼저 분리해 진행한다.
+
+### 검토한 4가지 경로
+
+| 안 | 요약 | 채택? |
+|----|------|------|
+| A | OpenCV.js 별도 WASM 런타임 + JS 코디네이터 | △ (가능, 비용 ~2-3 ms/frame, 운영 복잡 ↑) |
+| B | g2o처럼 `add_subdirectory(opencv)` 시도 | ❌ **막힘** — issue [#27548](https://github.com/opencv/opencv/issues/27548) 미해결 (2025-07~), 4.x CMake가 `${CMAKE_SOURCE_DIR}/modules/...` 절대경로로 사용자 top-level project를 가리킴 |
+| **B′** | **OpenCV 별도 빌드 → static lib(.a) → 우리 myslam 타깃에 링크** | ✅ **채택** |
+| C | 순수 C++ 자체 GFTT/Harris/LK 작성 | △ (학습 가치 ↑, 향후 calib3d 재도입 시 부담 ↑) |
+
+### B′ 선택 근거 (요약)
+
+1. **PLAN.md §1.3 "OpenCV.js 4.10+ 커스텀 빌드"의 정신**(ch13 OpenCV 의존을 살리되 모듈 최소)을 가장 충실히 구현.
+2. 4.x `CMakeLists.txt` 분석 결과 (April 2026 기준):
+   - `BUILD_LIST=core,imgproc,features2d,video` (line 285) — 모듈 cherry-pick 일급 지원.
+   - `CV_DISABLE_OPTIMIZATION=ON` (line 1050) — SIMD intrinsic 단일 플래그로 차단.
+   - `WITH_JPEG/PNG/TIFF/WEBP/PROTOBUF/IPP=OFF` — image I/O 코덱 깔끔히 제거(이미지는 JS `createImageBitmap`으로 디코드).
+   - `if(EMSCRIPTEN)` 분기 (line 1486) — 시스템 라이브러리 자동 스킵.
+3. **단일 myslam.wasm 안에서 g2o + OpenCV가 함께 링크** → 두 런타임 cross-runtime overhead 0, `.delete()` 위생 부담 없음.
+4. 향후 Step 8 PnP에서 cv::solvePnPRansac을 추가할 때 `BUILD_LIST`에 `calib3d` 추가만 하면 됨.
+5. 이미 입증된 패턴: Phase A+에서 g2o submodule + cmake `find_package(g2o ...)`로 동작 확인.
+
+### 게이트 — Phase C 본 작업 착수 전 필수 spike (Q1~Q4)
+
+본 작업(`bind_features.cpp`, Step 3/4 UI, AlgoPicker)에 들어가기 전에 다음 4개 질문에 답한다. Phase A+ g2o 스파이크와 같은 정신.
+
+- **Q1**: OpenCV 4.13.0 submodule이 emscripten toolchain + `BUILD_LIST=core,imgproc,features2d,video` + 위 disable 플래그 조합으로 빌드 완료되는가? (예상 30~60분)
+- **Q2**: `BUILD_SHARED_LIBS=OFF` + `BUILD_opencv_js=OFF` 로 install_prefix에 `libopencv_core.a`, `libopencv_imgproc.a`, `libopencv_features2d.a`, `libopencv_video.a` + 헤더가 떨어지는가?
+- **Q3**: 우리 `wasm-src/CMakeLists.txt`에서 `find_package(OpenCV 4.13 REQUIRED PATHS .../opencv-install NO_DEFAULT_PATH)` 로 detect되고, 새 `cv_spike` 타깃에 `OpenCV::core`/`imgproc`/`features2d`/`video` 가 링크되는가?
+- **Q4**: 가장 단순한 `cv::goodFeaturesToTrack` + `cv::calcOpticalFlowPyrLK` 호출이 KITTI mini frame 0에서 합리적 결과(특징점 수 ≈ 150, 분포가 체커보드 코너 근처)를 내는가? `verify_cv.mjs` Node 스모크.
+
+**Gate 판정**:
+- ✅ 4개 모두 통과 → 본 작업 착수.
+- ❌ Q1/Q2 실패 (빌드 자체 막힘) → A안(OpenCV.js 별도 런타임)으로 fallback.
+- ❌ Q3 실패 (링크 단계) → 빌드는 되지만 통합 미해결 — issue 분석 후 ExternalProject_Add 또는 직접 `target_link_libraries(... ${OpenCV_LIBS})` 시도.
+- ❌ Q4 실패 (수치 이상) → spike 환경 자체 디버깅(이미지 디코딩 / Mat 변환).
+
+### 본 작업 (게이트 통과 후)
+
+PLAN §9 Phase C 1.5주 추정과 일치. 단, OpenCV.js 빌드 대신 **분리 빌드 + 링크**로 구현.
+
+1. `bind_features.cpp` — `detectFeatures(rgba, w, h, opts)` (algo: GFTT/Harris/FAST/ORB), `trackLK(prev, curr, w, h, pts, opts)`. Embind 인터페이스는 기존 `bind_camera.cpp` 패턴과 동일.
+2. CMake 통합 — `wasm-src/third_party/opencv/`(submodule) + 별도 빌드 디렉토리 + `find_package`. `build.sh`에 `features` 타깃 추가 + 첫 빌드 캐시 안내.
+3. TS 로더 `src/wasm/features.ts` (기존 `camera.ts` 패턴).
+4. Step 3 UI: AlgoPicker(GFTT/Harris/FAST/ORB), maxFeatures/minDist/qualityLevel/blockSize 슬라이더, 좌 이미지 위 keypoint 오버레이, VerifyGate(검출 수 ≈ 설정값, 분포 균등성).
+5. Step 4 UI: Step 3 결과 → `cv::calcOpticalFlowPyrLK` → 좌→우 대응선 시각화, VerifyGate(매칭율 ≥ 60%).
+6. SIMD/MT variant, WebGL/WebGPU 가속 경로는 **Phase C+로 분리** (PLAN §4 매트릭스의 Step 3/4 행).
+
+### 의식적으로 deferred
+
+- FAST/ORB 외 SIFT/AKAZE 등 contrib 모듈 — features2d로 충족, contrib 통합은 Phase 후반에 재평가.
+- WebGL Harris / WebGPU GFTT — Phase C에서는 OpenCV 경로만. Phase C+ 또는 Phase I 마감 단계에서 추가.
+- WASM SIMD/MT variant — Phase G(BA) spike에서 성능 측정 후 일괄 도입 예정.
 
 ---
 
