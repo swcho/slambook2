@@ -5,7 +5,7 @@
 
 - **시작일**: 2026-04-17
 - **최근 갱신**: 2026-04-26
-- **현재 진행 중**: **Phase C 본 작업** — 게이트 spike(Q1~Q4) 통과(2026-04-26). 다음: `bind_features.cpp` + Step 3/4 UI(AlgoPicker, GFTT/Harris/FAST/ORB + LK 트랙). 자세한 내용은 아래 "Phase C — 게이트 spike 결과" 섹션 참조
+- **현재 진행 중**: **Phase D 착수 대기** — Phase C Step 3(Feature Detection) + Step 4(Stereo LK) 본 작업 완료(2026-04-26). 다음: Phase D Step 5(Triangulation) + Step 6(Initial Map). SIMD/MT variant·WebGL/WebGPU 가속 경로는 Phase C+로 deferred.
 
 ---
 
@@ -21,8 +21,10 @@
 | Phase B Step 1 (Dataset Loader) | ✅ 2026-04-25 — KITTI 05 calib 파싱 + 5프레임 mini fixture + 좌/우 이미지 렌더링, 자동 verify gate 통과 |
 | Phase B Step 2 (Camera Model) | ✅ 2026-04-25 — WASM Camera 바인딩 round-trip 오차 1.06e-15 (60-point 그리드 기준, 임계 1e-5) |
 | Phase C 게이트 spike (Q1~Q4) | ✅ 2026-04-26 — OpenCV 4.13.0 분리 빌드 + cv_spike 단일 myslam.wasm 통합 + GFTT 200/200 + LK 100% (mean dx = −14.00 px) |
+| Phase C Step 3 (Feature Detection) | ✅ 2026-04-26 — `myslam_features.baseline.wasm` 1.14 MB. GFTT/Harris/FAST/ORB 4개 algo + 마스크 + Step3 UI (AlgoPicker, 슬라이더, 오버레이). 4개 algo 모두 200/200 kps, mask 100×100 hole 0/0 |
+| Phase C Step 4 (Stereo LK) | ✅ 2026-04-26 — `bind_features.trackLK` (winSize/maxLevel/maxIter/eps/useInitialFlow). Step4 UI (좌→우 매칭선, 200/200 트랙, mean dx=-21.95 px, mean &#124;dy&#124;=0.00 px on synthetic stereo) |
 | 현재 브랜치 | `ex` |
-| 마지막 커밋 | `25076f3` (Phase C 백엔드 경로 결정) → 본 spike 커밋 예정 |
+| 마지막 커밋 | `c3d1659` (Phase C 게이트 spike) → 본 작업 커밋 예정 |
 
 ---
 
@@ -33,10 +35,11 @@
   - 결과: **✅ success** — 원안대로 Phase B 이후 진행. g2o 경로 채택 (Stage 1 PnP 통과 + Stage 2 BA via `solver_eigen`/`SimplicialLLT` 통과)
   - Open follow-up: CXSparse 자체의 Emscripten 빌드는 미검증 — Phase G에서 성능이 부족하면 그때 통합 재평가
 - [x] **Phase B** — Step 1~2 Dataset + Camera ← 2026-04-25 완료
-- [ ] **Phase C** — Step 3~4 Feature Detection + Stereo LK
+- [x] **Phase C** — Step 3~4 Feature Detection + Stereo LK ← 2026-04-26 완료
   - [x] 게이트 spike(Q1~Q4) ← 2026-04-26 통과 (OpenCV 4.13.0 분리 빌드 → static lib → find_package → cv::goodFeaturesToTrack + cv::calcOpticalFlowPyrLK 검증)
-  - [ ] Step 3 본 작업 — `bind_features.cpp`, AlgoPicker(GFTT/Harris/FAST/ORB), Step3 UI
-  - [ ] Step 4 본 작업 — LK 좌→우 매칭, Step4 UI
+  - [x] Step 3 본 작업 — `bind_features.cpp`, AlgoPicker(GFTT/Harris/FAST/ORB), Step3 UI
+  - [x] Step 4 본 작업 — LK 좌→우 매칭, Step4 UI
+  - Phase C+로 deferred: SIMD/MT variant 빌드, WebGL Harris / WebGPU GFTT, OpenCV contrib(SIFT/AKAZE)
 - [ ] **Phase D** — Step 5~6 Triangulation + Initial Map
 - [ ] **Phase E** — Step 7~8 Frame Tracking + PnP
 - [ ] **Phase F** — Step 9~10 Keyframe + New MapPoints
@@ -52,8 +55,8 @@
 |------|------|----------------|------|
 | 1. Dataset Loader | ✅ | ✅ | KITTI 05 calib(P0~P3) 파싱 + downsample(0.25/0.5/1.0) + 좌/우 이미지 표시. 게이트: 4 카메라 파싱, baseline>0, L/R 해상도 일치, K·downsample 적용 |
 | 2. Camera Model | ✅ | ✅ | WASM `myslam_camera.baseline` 18 KB. 게이트: 60-point 그리드 round-trip maxErr < 1e-5 (실측 1.06e-15). P0/P1 extrinsic 선택 가능 |
-| 3. Feature Detection | ⬜ | ⬜ | |
-| 4. Stereo Matching (LK) | ⬜ | ⬜ | |
+| 3. Feature Detection | ✅ | ✅ | `myslam_features.baseline` 1.14 MB. GFTT/Harris/FAST/ORB + 마스크. 게이트: WASM 로드, 좌측 이미지 로드, 검출수 ≥ max·0.5, 4×4 그리드 ≥ 8 셀 분포 |
+| 4. Stereo Matching (LK) | ✅ | ✅ | LK pyramid (winSize/maxLevel/maxIter/eps/useInitialFlow). 게이트: 매칭율 ≥ 60%, mean &#124;dy&#124; ≤ 2 px, mean dx < 0 |
 | 5. Triangulation | ⬜ | ⬜ | |
 | 6. Initial Map | ⬜ | ⬜ | |
 | 7. Frame Tracking | ⬜ | ⬜ | |
@@ -91,7 +94,10 @@
 | 2026-04-26 | **OpenCV CMake 통합 — `OpenCV_DIR` 직접 지정**: `find_package(OpenCV ... PATHS … NO_DEFAULT_PATH)`만으로는 `lib/cmake/opencv4/`의 `OpenCVConfig.cmake`를 매칭하지 못함 | 패키지 이름(`OpenCV`)과 디렉터리 이름(`opencv4`)이 case-insensitive로도 어긋남. CMake 3.20 기준 검증된 동작 | `set(OpenCV_DIR "${prefix}/lib/cmake/opencv4" CACHE PATH "" FORCE)` 후 `find_package(OpenCV 4.13 REQUIRED COMPONENTS … NO_DEFAULT_PATH)` 패턴으로 픽스. 향후 contrib 통합 시에도 동일 |
 | 2026-04-26 | **`-fexceptions` + `DISABLE_EXCEPTION_CATCHING=0`을 `cv_spike` 타깃에 한정**(g2o spike 패턴 확장 X) | OpenCV는 `cv::Exception` throw, g2o spike도 마찬가지지만 `hello`/`camera`처럼 예외 없는 타깃은 zero-cost. PLAN §10 번들 가드 유지 | Step 3/4 본 바인딩(`bind_features.cpp`)에서 동일 플래그를 자기 타깃에만 추가 |
 | 2026-04-26 | **TS 우선 규칙(memory도 갱신)**: 스파이크 검증 스크립트는 `wasm-src/spike/verify_cv.ts` + `node --experimental-strip-types` | `verify_pnp.mjs`/`verify_ba.mjs`(2026-04-18 작성)는 그대로 두되 신규 Node 스크립트는 모두 TS. `tsconfig.node.json` include에 `wasm-src/spike/**/*.ts` 추가 — `@types/node` 자동 적용 | 사용자 명시 피드백(2026-04-26): "please use typescript whenever possible". memory `feedback_typescript_default.md` 참조 |
+| 2026-04-26 | **`bind_features` API: Float64Array 3-stride [x,y,score] 단일 표준** | cv_spike는 detect→2-stride, track 입력 또한 2-stride였으나 본 바인딩에서 stride 자동 감지가 모호함(N=3일 때 length=6은 2/3 둘 다 해석 가능). 단일 표준으로 통일하면 Step 3→4 파이프라인이 detect 출력을 그대로 trackLK에 넘길 수 있어 boilerplate 제거 | trackLK opts.initialPts도 동일 3-stride. score 필드는 LK에서 무시 |
+| 2026-04-26 | **CMake 헬퍼 함수 `_ch13_import_opencv()` 도입** | cv_spike + features 두 타깃이 동일한 `find_package(OpenCV …)` 절차를 반복 — DRY 위반 + 향후 OpenCV consumer 추가 시 cargo-cult 위험 | `wasm-src/CMakeLists.txt` 안에서만 사용. 다른 옵션(빌드 트리 변경, contrib 추가)도 단일 진입점에서 관리 |
 | _(미정)_ | OpenCV submodule 채택 시 contrib(SIFT/AKAZE)까지 포함할지 여부 | features2d만으로 GFTT/Harris/FAST/ORB 충족 — contrib는 Step 11 BA·Loop closure 시점에 재평가 | 번들 크기 |
+| _(미정)_ | Phase C+ — SIMD/MT variant 빌드 도입 시점 | 현재 baseline만 빌드. PLAN §4 매트릭스의 Step 3/4 행 활성화는 Phase G(BA) spike 결과로 성능 병목 위치를 확인한 뒤 일괄 도입이 효율적 | OpenCV 분리 빌드를 variant마다 1회씩 추가로 돌려야 함 (~5분 × 4) |
 
 ---
 
@@ -119,15 +125,20 @@
   - 데이터셋 생성기: `ch13-wasm/scripts/gen-kitti-mini.ts`
   - WASM hello 소스: `ch13-wasm/wasm-src/myslam/bindings/bind_hello.cpp`
   - WASM Camera 바인딩: `ch13-wasm/wasm-src/myslam/bindings/bind_camera.cpp`
+  - WASM Features 바인딩 (Step 3+4): `ch13-wasm/wasm-src/myslam/bindings/bind_features.cpp`
   - Phase A+ 스파이크: `ch13-wasm/wasm-src/spike/{bind_pnp_spike.cpp, bind_ba_spike.cpp, verify_pnp.mjs, verify_ba.mjs, verify_pnp_diag*.mjs}`
   - Phase C 게이트 스파이크: `ch13-wasm/wasm-src/spike/{bind_cv_spike.cpp, verify_cv.ts}` — `npm run verify:cv_spike`
-  - 빌드 스크립트: `ch13-wasm/wasm-src/{CMakeLists.txt, build.sh}` — `bash build.sh [baseline|simd|mt|mt-simd] [hello|camera|pnp_spike|ba_spike|cv_spike]`
+  - Phase C 본 작업 검증: `ch13-wasm/wasm-src/spike/verify_features.ts` — `npm run verify:features`
+  - 빌드 스크립트: `ch13-wasm/wasm-src/{CMakeLists.txt, build.sh}` — `bash build.sh [baseline|simd|mt|mt-simd] [hello|camera|pnp_spike|ba_spike|cv_spike|features]`
   - OpenCV 분리 빌드 스크립트: `ch13-wasm/wasm-src/scripts/build-opencv.sh` — `npm run build:opencv:baseline`
   - g2o submodule (modern master): `ch13-wasm/wasm-src/third_party/g2o/`
   - Eigen submodule (tag 5.0.1): `ch13-wasm/wasm-src/third_party/eigen/`
   - OpenCV submodule (tag 4.13.0, shallow): `ch13-wasm/wasm-src/third_party/opencv/`
   - OpenCV 빌드 산출물: `ch13-wasm/wasm-src/build/opencv-{build,install}-<variant>/` (gitignored). install/lib에 `libopencv_{core,imgproc,features2d,video}.a`
-  - 빌드 산출물: `ch13-wasm/public/wasm/myslam_{hello,camera,pnp_spike,ba_spike,cv_spike}.<variant>.{js,wasm}`
+  - 빌드 산출물: `ch13-wasm/public/wasm/myslam_{hello,camera,pnp_spike,ba_spike,cv_spike,features}.<variant>.{js,wasm}`
+  - Step 3 UI: `ch13-wasm/src/steps/Step03_FeatureDetection/`
+  - Step 4 UI: `ch13-wasm/src/steps/Step04_StereoMatching/`
+  - TS 로더: `ch13-wasm/src/wasm/features.ts` (`loadFeaturesWasm` + `imageDataToGray`)
 - (예정) 단계별 학습 노트: `docs/steps/NN-*.md`
 
 ---
@@ -322,6 +333,80 @@ PLAN §9 Phase C 1.5주 추정과 일치. 단, OpenCV.js 빌드 대신 **분리 
 - FAST/ORB 외 SIFT/AKAZE 등 contrib 모듈 — features2d로 충족, contrib 통합은 Phase 후반에 재평가.
 - WebGL Harris / WebGPU GFTT — Phase C에서는 OpenCV 경로만. Phase C+ 또는 Phase I 마감 단계에서 추가.
 - WASM SIMD/MT variant — Phase G(BA) spike에서 성능 측정 후 일괄 도입 예정.
+
+---
+
+## Phase C — Step 3/4 본 작업 완료 (2026-04-26)
+
+### 결과 요약
+
+| 항목 | 값 |
+|------|-----|
+| `bind_features.cpp` | 247 LOC. Embind: `detectFeatures(grayU8, w, h, algo, opts)` + `trackLK(prev, curr, w, h, prevPts, opts)` + `opencvVersion()` + 4개 `DETECTOR_*` enum |
+| 지원 알고리즘 | GFTT / Harris (`cv::goodFeaturesToTrack(useHarris=true)`) / FAST (`cv::FAST` + 마스크 후처리 + nth_element 컷오프) / ORB (`cv::ORB::create`) |
+| LK API | `winSize`, `maxLevel`, `maxIter`, `eps`, `useInitialFlow`, `initialPts` 모두 노출. ch13의 `OPTFLOW_USE_INITIAL_FLOW` 패턴 그대로 |
+| WASM 크기 | `myslam_features.baseline.{js, wasm}` = 88 KB + **1143 KB** (cv_spike 750 KB 대비 +52% — ORB/FAST 코드 추가) |
+| 빌드 시간 | 단일 .cpp → ~6초 (OpenCV는 캐시 재사용) |
+
+### `verify_features.ts` 검증 결과 (`npm run verify:features`)
+
+| 케이스 | 결과 |
+|--------|------|
+| OpenCV version | 4.13.0 ✅ |
+| GFTT detect (synthetic frame 0, maxFeatures=200) | 200 / 200 in 211 ms |
+| Harris detect | 200 / 200 in 213 ms |
+| FAST detect | 200 / 200 in 210 ms |
+| ORB detect | 202 in 211 ms |
+| GFTT + 100×100 mask hole | 200 kps, **0** inside hole (mask 정상) |
+| LK 좌→우(no init), expected dx ≈ −22 | tracked 200/200 (100%), **mean dx = −21.95**, mean dy = −0.00 |
+| LK with `useInitialFlow` + GT-shifted seeds | tracked 200/200, mean dx = −21.95 (동일 수치, init 정상) |
+
+### Step 3/4 UI 헤드리스 검증 (2026-04-26)
+
+| 항목 | 관측값 |
+|------|--------|
+| `GET /step/feature-detection` | 200 text/html (SPA fallback) |
+| `GET /step/stereo-matching`   | 200 text/html (SPA fallback) |
+| `GET /wasm/myslam_features.baseline.js` | 200 text/javascript, 90 083 B, COEP/COOP 반영 |
+| `GET /wasm/myslam_features.baseline.wasm` | 200 application/wasm, 1 143 809 B, COEP/COOP 반영 |
+| `npm run build` | tsc -b clean + vite build OK — `dist/assets/index-*.js` = 287.84 KB (gzip **92.25 KB**, PLAN §10 ≤ 400 KB 충족) |
+
+### Step 3 — Feature Detection (UI)
+
+- 4개 알고리즘 토글 (GFTT/Harris/FAST/ORB). 알고리즘별 적용 가능한 슬라이더만 표시 (예: `qualityLevel`/`minDistance`/`blockSize`는 GFTT/Harris, `fastThreshold`는 FAST, `orbScaleFactor`/`orbNLevels`는 ORB).
+- frame slider (0..4), `maxFeatures` slider (20..500).
+- 좌측 입력: KITTI mini fixture left 이미지를 `imageDataToGray`로 8-bit grayscale 변환.
+- 우측 출력: 동일 이미지 위에 검출된 keypoint를 녹색 원으로 오버레이 + 검출 시간(ms) + 4×4 그리드 coverage(N/16).
+- VerifyGate 자동 게이트:
+  1. WASM 모듈 로드 (OpenCV 4.13.0 매칭)
+  2. 좌측 이미지 로드
+  3. 검출 수 ≥ max(30, maxFeatures × 0.5)
+  4. 4×4 그리드 ≥ 8 cells에 분포 (한쪽 쏠림 가드)
+
+### Step 4 — Stereo Matching (LK)
+
+- Step 3와 같은 detector 토글 + LK pyramid 슬라이더 (winSize 5..31, maxLevel 0..5, maxIter 5..60, eps 0.001..0.1) + `useInitialFlow` 체크박스.
+- 좌측 입력: stereo pair 좌/우를 vertical stack으로 표시 + baseline(m) 표시.
+- 우측 출력: 좌(상단) + 우(하단) 합성 캔버스에 매칭 라인 오버레이. 녹색=추적 성공, 빨강=실패.
+- 요약 표시: `tracked`, `mean dx`, `mean |dy|`, detect ms, LK ms.
+- VerifyGate 자동 게이트:
+  1. WASM 모듈 로드
+  2. 좌/우 프레임 + calib 로드
+  3. 매칭율 ≥ 60% (PLAN §3 Step 4 검증 기준)
+  4. 평균 epipolar `|dy|` ≤ 2 px (PLAN §3 Step 4 검증 기준)
+  5. 평균 disparity dx < 0 (우측이 좌로 이동했음을 sign으로 확인)
+
+### 의식적으로 deferred (Phase C+로 분리)
+
+- WASM SIMD/MT variant 빌드 — Phase G BA spike 후 일괄 도입.
+- WebGL Harris / WebGPU GFTT — Phase I 마감 단계에서 합류 검토.
+- 알고리즘 교차 벤치마크 표 (`benchStore` 통합) — `PerfMeter`가 stub인 채라 PerfMeter 본 구현 시점에 추가.
+- 학습 노트 `docs/steps/03-feature-detection.md`, `04-stereo-matching.md` — Phase I 문서화 단계.
+
+### 남은 사용자 육안 관측
+
+- `http://localhost:5173/step/feature-detection`: 알고리즘 토글 시 keypoint 오버레이가 4개 패턴(GFTT는 코너 집중, FAST는 임계값에 따른 샤프함, ORB는 스케일 분포)으로 변하는지 확인.
+- `http://localhost:5173/step/stereo-matching`: 매칭 라인이 거의 수평하고 (epipolar) 좌→우 방향으로 수십 px 이동하는지 확인. `useInitialFlow` 토글 후 평균 dx가 더 stable해지는지 비교.
 
 ---
 

@@ -1,6 +1,8 @@
 import type { ComponentType } from 'react';
 import { Step01Dataset } from './Step01_Dataset';
 import { Step02Camera } from './Step02_Camera';
+import { Step03FeatureDetection } from './Step03_FeatureDetection';
+import { Step04StereoMatching } from './Step04_StereoMatching';
 
 export interface StepMeta {
   id: number;
@@ -13,8 +15,8 @@ export interface StepMeta {
 export const STEPS: StepMeta[] = [
   { id: 1,  slug: 'dataset',           title: 'Dataset Loader (KITTI)',        summary: '스테레오 쌍 + 캘리브레이션 로딩', Component: Step01Dataset },
   { id: 2,  slug: 'camera',            title: 'Camera Model',                  summary: '핀홀 투영 / 역투영', Component: Step02Camera },
-  { id: 3,  slug: 'feature-detection', title: 'Feature Detection',             summary: 'GFTT / FAST / ORB / Harris' },
-  { id: 4,  slug: 'stereo-matching',   title: 'Stereo Matching (LK)',          summary: 'LK 피라미드 광학 흐름' },
+  { id: 3,  slug: 'feature-detection', title: 'Feature Detection',             summary: 'GFTT / FAST / ORB / Harris', Component: Step03FeatureDetection },
+  { id: 4,  slug: 'stereo-matching',   title: 'Stereo Matching (LK)',          summary: 'LK 피라미드 광학 흐름', Component: Step04StereoMatching },
   { id: 5,  slug: 'triangulation',     title: 'Triangulation (SVD)',           summary: 'DLT 삼각화 + 조건수' },
   { id: 6,  slug: 'initial-map',       title: 'Initial Map Construction',      summary: '첫 키프레임 + 초기 지도' },
   { id: 7,  slug: 'frame-tracking',    title: 'Frame Tracking (LK prev→curr)', summary: '투영 초기치 + LK 추적' },

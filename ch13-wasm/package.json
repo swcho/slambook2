@@ -15,6 +15,8 @@
     "build:opencv:baseline": "bash wasm-src/scripts/build-opencv.sh baseline",
     "build:wasm:cv_spike": "bash wasm-src/build.sh baseline cv_spike",
     "verify:cv_spike": "node --experimental-strip-types wasm-src/spike/verify_cv.ts",
+    "build:wasm:features": "bash wasm-src/build.sh baseline features",
+    "verify:features": "node --experimental-strip-types wasm-src/spike/verify_features.ts",
     "gen:dataset": "node --experimental-strip-types scripts/gen-kitti-mini.ts"
   },
   "dependencies": {

@@ -15,6 +15,8 @@ endif()
 #   pnp_spike  (Phase A+ Stage 1) — g2o + Eigen PnP spike
 #   ba_spike   (Phase A+ Stage 2) — g2o + Eigen BA spike
 #   camera     (Phase B Step 2)   — minimal pinhole Camera binding
+#   cv_spike   (Phase C gate)     — minimal OpenCV smoke test
+#   features   (Phase C / Step 3+4) — GFTT/Harris/FAST/ORB + LK binding
 if(NOT DEFINED CH13_WASM_TARGET)
   set(CH13_WASM_TARGET "hello")
 endif()
@@ -219,6 +221,31 @@ if(CH13_WASM_TARGET STREQUAL "pnp_spike" OR CH13_WASM_TARGET STREQUAL "ba_spike"
 endif()
 
 # -----------------------------------------------------------------------------
+# Helper: import the pre-built static OpenCV (B′ path). Both cv_spike (gate)
+# and features (Phase C body) consume the same install tree produced by
+# `bash wasm-src/scripts/build-opencv.sh ${CH13_WASM_VARIANT}`.
+# -----------------------------------------------------------------------------
+function(_ch13_import_opencv)
+  set(_opencv_install
+    "${CMAKE_CURRENT_SOURCE_DIR}/build/opencv-install-${CH13_WASM_VARIANT}")
+  if(NOT EXISTS "${_opencv_install}/lib/cmake/opencv4/OpenCVConfig.cmake")
+    message(FATAL_ERROR
+      "OpenCV install not found at ${_opencv_install}. "
+      "Run: bash wasm-src/scripts/build-opencv.sh ${CH13_WASM_VARIANT}")
+  endif()
+  # OpenCV ships its CMake package at <prefix>/lib/cmake/opencv4/, but
+  # find_package's case-insensitive heuristic doesn't reliably match the
+  # `opencv4` dir to the package name `OpenCV` across CMake versions, so
+  # point OpenCV_DIR at the config dir directly.
+  set(OpenCV_DIR "${_opencv_install}/lib/cmake/opencv4" CACHE PATH "" FORCE)
+  find_package(OpenCV 4.13 REQUIRED
+    COMPONENTS core imgproc features2d video
+    NO_DEFAULT_PATH)
+  message(STATUS "[ch13-wasm] OpenCV ${OpenCV_VERSION} from ${OpenCV_DIR}")
+  set(OpenCV_LIBS "${OpenCV_LIBS}" PARENT_SCOPE)
+endfunction()
+
+# -----------------------------------------------------------------------------
 # Target: cv_spike (Phase C gate) — minimal OpenCV smoke test.
 #
 # Consumes the pre-built static OpenCV (BUILD_LIST=core,imgproc,features2d,video)
@@ -230,23 +257,7 @@ endif()
 # target_link_libraries pattern.
 # -----------------------------------------------------------------------------
 if(CH13_WASM_TARGET STREQUAL "cv_spike")
-  set(_opencv_install
-    "${CMAKE_CURRENT_SOURCE_DIR}/build/opencv-install-${CH13_WASM_VARIANT}")
-  if(NOT EXISTS "${_opencv_install}/lib/cmake/opencv4/OpenCVConfig.cmake")
-    message(FATAL_ERROR
-      "OpenCV install not found at ${_opencv_install}. "
-      "Run: bash wasm-src/scripts/build-opencv.sh ${CH13_WASM_VARIANT}")
-  endif()
-
-  # OpenCV ships its CMake package as <prefix>/lib/cmake/opencv4/, but
-  # find_package's case-insensitive heuristic doesn't reliably match the
-  # `opencv4` dir to the package name `OpenCV` across CMake versions, so
-  # point OpenCV_DIR at the config dir directly.
-  set(OpenCV_DIR "${_opencv_install}/lib/cmake/opencv4" CACHE PATH "" FORCE)
-  find_package(OpenCV 4.13 REQUIRED
-    COMPONENTS core imgproc features2d video
-    NO_DEFAULT_PATH)
-  message(STATUS "[ch13-wasm] OpenCV ${OpenCV_VERSION} from ${OpenCV_DIR}")
+  _ch13_import_opencv()
 
   add_executable(myslam_cv_spike spike/bind_cv_spike.cpp)
   target_compile_options(myslam_cv_spike PRIVATE -O3 ${VARIANT_FLAGS})
@@ -269,6 +280,38 @@ if(CH13_WASM_TARGET STREQUAL "cv_spike")
 
   set_target_properties(myslam_cv_spike PROPERTIES
     OUTPUT_NAME "myslam_cv_spike.${CH13_WASM_VARIANT}"
+    SUFFIX ".js"
+  )
+endif()
+
+# -----------------------------------------------------------------------------
+# Target: features (Phase C / Step 3 + Step 4) — production binding.
+# Mirrors cv_spike's link/flag setup; the source moves from spike/ to
+# myslam/bindings/ and the API gains algo enum + LK opts.
+# -----------------------------------------------------------------------------
+if(CH13_WASM_TARGET STREQUAL "features")
+  _ch13_import_opencv()
+
+  add_executable(myslam_features myslam/bindings/bind_features.cpp)
+  target_compile_options(myslam_features PRIVATE -O3 ${VARIANT_FLAGS})
+  # OpenCV throws cv::Exception, so we need exception support like cv_spike.
+  target_compile_options(myslam_features PRIVATE -fexceptions)
+  target_link_options(myslam_features PRIVATE
+    -O3 --bind
+    -fexceptions
+    -sDISABLE_EXCEPTION_CATCHING=0
+    -sMODULARIZE=1
+    -sEXPORT_ES6=1
+    -sEXPORT_NAME=createFeaturesModule
+    -sALLOW_MEMORY_GROWTH=1
+    -sENVIRONMENT=web,worker,node
+    -sWASM=1
+    ${VARIANT_LINK}
+  )
+  target_link_libraries(myslam_features PRIVATE ${OpenCV_LIBS})
+
+  set_target_properties(myslam_features PROPERTIES
+    OUTPUT_NAME "myslam_features.${CH13_WASM_VARIANT}"
     SUFFIX ".js"
   )
 endif()
