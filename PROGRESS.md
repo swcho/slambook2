@@ -5,7 +5,7 @@
 
 - **시작일**: 2026-04-17
 - **최근 갱신**: 2026-04-26
-- **현재 진행 중**: **Phase E 착수 대기** — Phase D Step 5(Triangulation) + Step 6(Initial Map) 본 작업 완료(2026-04-26). 다음: Phase E Step 7(Frame Tracking, LK prev→curr) + Step 8(PnP via g2o).
+- **현재 진행 중**: **Phase E 진행 중** — Step 7(Frame Tracking, LK prev→curr) 완료(2026-04-26). 다음: Step 8(Pose Estimation, PnP via g2o) — Phase A+ `bind_pnp_spike`를 본 바인딩으로 끌어올리고 4-라운드 outlier 시각화 추가.
 
 ---
 
@@ -25,8 +25,9 @@
 | Phase C Step 4 (Stereo LK) | ✅ 2026-04-26 — `bind_features.trackLK` (winSize/maxLevel/maxIter/eps/useInitialFlow). Step4 UI (좌→우 매칭선, 200/200 트랙, mean dx=-21.95 px, mean &#124;dy&#124;=0.00 px on synthetic stereo) |
 | Phase D Step 5 (Triangulation) | ✅ 2026-04-26 — `myslam_triangulation.baseline.wasm` 28 KB (Eigen-only). Linear SVD + Midpoint, σ4/σ3 quality + invertedReturn 토글. Step5 UI(top-down X-Z + depth histogram). 60-pt 합성 GT round-trip maxErr 3.96e-14 m |
 | Phase D Step 6 (Initial Map) | ✅ 2026-04-26 — Step6 UI(KeyFrame 카드 + r3f Scene3D: 좌/우 frustum + 초기 MapPoint 클라우드). num_features_init 게이트, depth 1–80 m 검증. Three.js + @react-three/{fiber@8, drei@9} 도입(React 18 호환), Step 6 lazy chunk로 분리 |
+| Phase E Step 7 (Frame Tracking) | ✅ 2026-04-26 — Step7 UI(prev/curr LK + init 전략 토글 `none`/`velocity` + velocity dx/dy 슬라이더 + maxIter sweep 차트). features WASM 재사용(C++ 추가 없음). 게이트: WASM 로드, prev+curr+calib 로드, tracked ≥ 50, 평균 dx ≈ −7 px (GT ± 2), 평균 \|dy\| ≤ 2 px. map-projection은 Step 8(PnP)에서 합류 |
 | 현재 브랜치 | `ex` |
-| 마지막 커밋 | `ea7b734` (Phase C Step 3+4) → 본 작업 커밋 예정 |
+| 마지막 커밋 | `527414b` (Phase D Step 5+6) → 본 작업 커밋 예정 |
 
 ---
 
@@ -45,7 +46,9 @@
 - [x] **Phase D** — Step 5~6 Triangulation + Initial Map ← 2026-04-26 완료
   - [x] Step 5 본 작업 — `bind_triangulation.cpp` (Eigen-only, JacobiSVD<4×4> + Midpoint), Step5 UI(top-down + depth histogram), invertedReturn 토글
   - [x] Step 6 본 작업 — Step6 UI(KeyFrame 카드 + r3f/drei Scene3D), num_features_init 게이트, lazy chunk 분리
-- [ ] **Phase E** — Step 7~8 Frame Tracking + PnP
+- [ ] **Phase E** — Step 7~8 Frame Tracking + PnP (진행 중)
+  - [x] Step 7 본 작업 — Step7 UI(prev/curr LK + init 전략 토글 + maxIter sweep 차트). features WASM 재사용 (C++ 신규 바인딩 없음)
+  - [ ] Step 8 본 작업 — `bind_pnp.cpp`(Phase A+ spike 승격) + 라운드별 outlier 시각화 + cv::solvePnPRansac 대체 경로
 - [ ] **Phase F** — Step 9~10 Keyframe + New MapPoints
 - [ ] **Phase G** — Step 11 Bundle Adjustment (난이도 최상)
 - [ ] **Phase H** — Step 12~13 Sliding Window + Full Pipeline
@@ -63,7 +66,7 @@
 | 4. Stereo Matching (LK) | ✅ | ✅ | LK pyramid (winSize/maxLevel/maxIter/eps/useInitialFlow). 게이트: 매칭율 ≥ 60%, mean &#124;dy&#124; ≤ 2 px, mean dx < 0 |
 | 5. Triangulation | ✅ | ✅ | `myslam_triangulation.baseline` 28 KB (Eigen-only). Linear SVD + Midpoint + invertedReturn 토글. 게이트: WASM 로드, 좌/우+calib 로드, accepted ≥ 30, mean depth > 0 ∧ ≤ 100 m |
 | 6. Initial Map | ✅ | ✅ | Step6 UI: KF0 frustum + 초기 MapPoint 3D 뷰(r3f/drei). 게이트: WASM 로드, 좌/우+calib 로드, landmarks ≥ num_features_init(50), all depth > 0, depth 1–80 m |
-| 7. Frame Tracking | ⬜ | ⬜ | |
+| 7. Frame Tracking | ✅ | ✅ | features WASM 재사용. prev/curr LK + init 전략 토글(`none`/`velocity`) + maxIter sweep 차트. 게이트: WASM 로드, prev+curr+calib, tracked ≥ 50, 평균 dx ≈ −7 px (합성 GT ± 2), 평균 &#124;dy&#124; ≤ 2 px |
 | 8. Pose Estimation (PnP) | ⬜ | ⬜ | |
 | 9. Keyframe Decision | ⬜ | ⬜ | |
 | 10. New MapPoints | ⬜ | ⬜ | |
@@ -106,6 +109,8 @@
 | 2026-04-26 | **Triangulation 바인딩 API: K(4) + T(12) 분리** — `triangulate(leftPts, rightPts, kL[4], tL[12], kR[4], tR[12], opts) → stride 5 [x,y,z,metric,ok]` | (1) 통합 P 행렬(3×4)을 받는 안은 학습자가 P = K[R\|t] 분해를 항상 머릿속으로 해야 함. K와 T를 분리하면 ch13의 `Camera::pixel2camera`(K^-1 적용) → `algorithm.h::triangulation`(SE3 + normalized point) 데이터 흐름이 그대로 보임. (2) K는 [fx,fy,cx,cy]만으로 충분(skew=0 가정 — KITTI rectified의 표준). (3) T는 12-float 3×4 row-major [R\|t] — Phase E(Step 7/8)에서 SE(3) pose가 들어와도 그대로 확장 가능 | TS 헬퍼 `makeK(fx,fy,cx,cy)` + `makeRectifiedT([tx,ty,tz])` 제공. KITTI 정류 stereo는 R=I 가정이므로 `tL = [I\|0]`, `tR = [I\|(-baseline,0,0)]` |
 | 2026-04-26 | **invertedReturn 토글의 의미** — 책 algorithm.h의 "포기 주석 vs 코드 polarity" 충돌을 학습자가 직접 토글로 관찰 | algorithm.h은 `σ4/σ3 < 1e-2`일 때 return true(주석은 "포기"라 적혀 있지만 caller가 `if (return)`으로 그 결과를 채택함). 본 binding의 default는 "fixed" 의미(quality good ↔ ok=1). 토글 시 caller의 polarity가 그대로 inverted된 효과 — fixed=N개 vs inverted=(total−N)개로 시각적으로 즉시 다름 | Step 5 UI에 체크박스로 노출. PLAN §3 Step 5 "학습용 반환 반전 버그 토글" 요구사항 충족 |
 | 2026-04-26 | **3D 시각화 라이브러리: react-three-fiber v8 + drei v9 + three** 채택 | (1) PLAN §1.1은 Three.js를 명시. (2) 사용자 명시 요청(2026-04-26): "r3f, drei를 사용해 줘" → 선언적 React-방식이 r3f의 컨벤션. (3) v8 LTS는 React 18 peer 충족(v9는 React 19 강제). (4) Step 6 컴포넌트는 lazy chunk로 분리 → 초기 번들 gzip **94.86 KB** 유지(PLAN §10 ≤ 400 KB), Step 6 chunk만 249 KB gzip(전용 페이지 진입 시에만 로드) | Phase H(Step 13 Full Pipeline)의 trajectory + 실시간 포인트 클라우드도 같은 Scene3D 컴포넌트 재사용 예정. drei `<Grid/><OrbitControls/><Line/>` 활용 — 렌더 루프/카메라 컨트롤 직접 작성 없음 |
+| 2026-04-26 | **Step 7은 신규 C++ 바인딩 없이 features WASM 재사용** — `bind_features.trackLK`가 이미 `useInitialFlow`/`initialPts` 노출 | (1) ch13 `Frontend::TrackLastFrame`은 `cv::calcOpticalFlowPyrLK`를 호출하는 30줄 함수로, 본질적으로 같은 카메라 시간축 LK. Phase C에서 Step 4용으로 이미 만든 바인딩과 100% 동일 OpenCV 호출. (2) 차이는 입력 페어(좌→우 vs prev→curr)와 init 전략(고정 좌측 좌표 vs 시간 prior). 둘 다 TS 측에서 표현 가능. (3) Step 7만의 독립 WASM을 만들면 OpenCV 정적 라이브러리 약 8 MB가 또 한 번 링크돼 빌드 시간/디스크 footprint가 무의미하게 증가. | Phase E의 본 C++ 작업은 Step 8(PnP)에 집중 — 그쪽은 g2o 의존이라 features WASM에 합칠 수 없음 |
+| 2026-04-26 | **Step 7 init 전략은 `none` + `velocity` 2종으로 시작, `map-projection`은 Step 8 후 합류** | (1) PLAN §3 Step 7은 "map projection / 직전 위치 / 없음" 3종 토글을 요구. (2) 그러나 `map-projection`은 추정된 상대 pose가 있어야 의미 있는데, 현재 Step 7만 단독으로 존재할 때는 임의의 상대 pose를 손으로 입력하는 "fake projection"이 되어 학습 가치가 떨어진다. 사용자가 진짜로 보고 싶은 것은 **"PnP 추정 pose가 다음 프레임 LK init에 어떻게 흘러가는가"** — Step 8 완료 후 자연스럽게 통합. (3) 현재 2종(`none` = `useInitialFlow=false`, `velocity` = `useInitialFlow=true`+사용자 dx/dy)도 PLAN §3의 핵심 학습 포인트("초기치 전략별 수렴 라운드 수 비교 차트")를 충분히 시연 — maxIter sweep 차트로 두 곡선의 plateau 도달 속도 차이가 즉시 보임. (4) 합성 fixture는 프레임당 14 px 좌측 이동 → 0.5× downsample 시 GT dx = −7 px. velocity 슬라이더 default를 −7로 두어 학습자가 "GT와 일치할 때" → "벗어날 때"의 추적률 변화를 능동 관찰 | Step 8 완료 시 `map-projection` 버튼 활성화 + Step 7 ParamPanel 토글 추가 |
 
 ---
 
@@ -150,6 +155,7 @@
   - Step 4 UI: `ch13-wasm/src/steps/Step04_StereoMatching/`
   - Step 5 UI: `ch13-wasm/src/steps/Step05_Triangulation/`
   - Step 6 UI: `ch13-wasm/src/steps/Step06_InitialMap/` (lazy chunk; r3f Scene3D)
+  - Step 7 UI: `ch13-wasm/src/steps/Step07_FrameTracking/` (features WASM 재사용, prev/curr LK + init 전략 토글 + maxIter sweep 차트)
   - 공통 Scene3D 컴포넌트: `ch13-wasm/src/components/Scene3D.tsx` (r3f + drei)
   - TS 로더: `ch13-wasm/src/wasm/features.ts` (`loadFeaturesWasm` + `imageDataToGray`)
   - TS 로더: `ch13-wasm/src/wasm/triangulation.ts` (`loadTriangulationWasm` + `makeK` + `makeRectifiedT`)
@@ -484,6 +490,43 @@ PLAN §9 Phase C 1.5주 추정과 일치. 단, OpenCV.js 빌드 대신 **분리 
 
 - `http://localhost:5173/step/triangulation`: invertedReturn 체크박스를 토글했을 때 "accepted" 카운트가 0과 (총수)로 극단적으로 점프하는지, top-down 뷰의 녹/빨강 비율이 뒤집히는지 확인.
 - `http://localhost:5173/step/initial-map`: r3f 캔버스에 두 frustum이 baseline만큼 떨어져 있고, 마우스 드래그/휠로 회전·줌이 부드럽게 동작하는지, num_features_init 슬라이더를 ≤ landmark count로 내리면 ✅ KF0가 점등되는지 확인.
+
+---
+
+## Phase E — Step 7 본 작업 완료 (2026-04-26)
+
+### 결과 요약
+
+| 항목 | 값 |
+|------|-----|
+| 신규 C++ | 없음 (Phase C `bind_features.cpp::trackLK` 재사용 — `useInitialFlow`/`initialPts` 이미 노출됨) |
+| 신규 TS UI | `src/steps/Step07_FrameTracking/index.tsx` (~520 LOC) |
+| Init 전략 | `none` (`useInitialFlow=false`), `velocity` (수동 dx/dy 슬라이더, default dx=−7 = 합성 fixture GT @ 0.5× downsample) |
+| 학습 시각화 | maxIter sweep `{1, 2, 3, 5, 8, 12, 20, 30}` × 두 전략 → SVG 라인차트 (수렴 라운드 비교) |
+| 데이터 페어 | KITTI mini fixture frame[i−1] → frame[i] (i ∈ 1..4). Detector는 prev 좌이미지에서 실행 |
+| 게이트 | (1) features WASM 로드 (2) prev+curr+calib 로드 (3) tracked ≥ 50 = `num_features_tracking` (4) 평균 dx ≈ −7 px (GT ± 2) (5) 평균 \|dy\| ≤ 2 px |
+
+### 헤드리스 검증 (2026-04-26)
+
+| 항목 | 관측값 |
+|------|--------|
+| `npm run build` | ✅ tsc -b clean + vite build — 초기 chunk **97.46 KB gzipped** (PLAN §10 ≤ 400 KB), Step 6 lazy chunk 249.03 KB gzip (변동 없음) |
+| `GET /step/frame-tracking` | 200 text/html, COEP/COOP 반영 |
+| `GET /wasm/myslam_features.baseline.{js,wasm}` | 200, COEP/COOP 반영 (Phase C와 동일 산출물 재사용) |
+
+### 의식적으로 deferred
+
+- **`map-projection` init 전략** — Step 8(PnP)에서 추정된 pose가 생긴 후 자연스럽게 합류. 현재 ParamPanel에 disabled chip으로 표시 + tooltip "available once Step 8 lands".
+- **수렴 횟수(per-point iteration count) 차트** — OpenCV `calcOpticalFlowPyrLK`가 per-point 수렴 카운트를 노출하지 않아 maxIter sweep으로 대체 (학습 효과 동등).
+- **MapPoint feedback loop** — `last_frame_->features_left_[i]->map_point_` 연결은 Phase F(Step 9~10) Map 매니저 도입 시점에 통합. 현재 Step 7은 view-only이며 Step 6과 마찬가지로 다음 단계로 흘러가는 영속 상태가 없음.
+- **벤치 차트 (`benchStore` 통합)** — `PerfMeter`가 stub인 채라 PerfMeter 본 구현 시점에 추가.
+
+### 남은 사용자 육안 관측
+
+- `http://localhost:5173/step/frame-tracking`: 
+  1. `velocity dx` 슬라이더를 GT(−7)에서 ±20 px로 벗어나게 변경 → tracked count가 점진적 → 급격하게 감소.
+  2. `init strategy` 토글 `none` ↔ `velocity` 시 maxIter sweep 차트의 녹색(velocity) 곡선이 적색(none)보다 좌측에서 빨리 plateau에 도달하는지.
+  3. curr frame 슬라이더(#0→#1, …, #3→#4)로 어느 페어든 평균 dx ≈ −7 px이 안정적으로 나오는지.
 
 ---
 
