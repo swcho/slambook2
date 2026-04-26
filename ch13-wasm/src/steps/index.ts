@@ -10,6 +10,7 @@ const Step06InitialMap = lazy(() =>
   import('./Step06_InitialMap').then((m) => ({ default: m.Step06InitialMap })),
 );
 import { Step07FrameTracking } from './Step07_FrameTracking';
+import { Step08PoseEstimation } from './Step08_PoseEstimation';
 
 export interface StepMeta {
   id: number;
@@ -27,7 +28,7 @@ export const STEPS: StepMeta[] = [
   { id: 5,  slug: 'triangulation',     title: 'Triangulation (SVD)',           summary: 'DLT 삼각화 + 조건수', Component: Step05Triangulation },
   { id: 6,  slug: 'initial-map',       title: 'Initial Map Construction',      summary: '첫 키프레임 + 초기 지도', Component: Step06InitialMap },
   { id: 7,  slug: 'frame-tracking',    title: 'Frame Tracking (LK prev→curr)', summary: '투영 초기치 + LK 추적', Component: Step07FrameTracking },
-  { id: 8,  slug: 'pose-estimation',   title: 'Pose Estimation (PnP)',         summary: 'g2o / solvePnPRansac / EPnP' },
+  { id: 8,  slug: 'pose-estimation',   title: 'Pose Estimation (PnP)',         summary: 'g2o / solvePnPRansac / EPnP', Component: Step08PoseEstimation },
   { id: 9,  slug: 'keyframe',          title: 'Keyframe Decision',             summary: '키프레임 삽입 정책' },
   { id: 10, slug: 'new-mappoints',     title: 'New MapPoints via Keyframe',    summary: '재검출 + 재삼각화' },
   { id: 11, slug: 'bundle-adjustment', title: 'Bundle Adjustment',             summary: '창 단위 BA + 적응적 chi²' },

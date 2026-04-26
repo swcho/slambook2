@@ -5,7 +5,7 @@
 
 - **시작일**: 2026-04-17
 - **최근 갱신**: 2026-04-26
-- **현재 진행 중**: **Phase E 진행 중** — Step 7(Frame Tracking, LK prev→curr) 완료(2026-04-26). 다음: Step 8(Pose Estimation, PnP via g2o) — Phase A+ `bind_pnp_spike`를 본 바인딩으로 끌어올리고 4-라운드 outlier 시각화 추가.
+- **현재 진행 중**: **Phase E 완료(2026-04-26)** — Step 8(Pose Estimation, PnP via g2o) 본 바인딩 + 4-라운드 outlier 시각화 + Step 8 UI 모두 통과. 다음: **Phase F** — Step 9(Keyframe Decision) + Step 10(New MapPoints via Keyframe).
 
 ---
 
@@ -26,8 +26,9 @@
 | Phase D Step 5 (Triangulation) | ✅ 2026-04-26 — `myslam_triangulation.baseline.wasm` 28 KB (Eigen-only). Linear SVD + Midpoint, σ4/σ3 quality + invertedReturn 토글. Step5 UI(top-down X-Z + depth histogram). 60-pt 합성 GT round-trip maxErr 3.96e-14 m |
 | Phase D Step 6 (Initial Map) | ✅ 2026-04-26 — Step6 UI(KeyFrame 카드 + r3f Scene3D: 좌/우 frustum + 초기 MapPoint 클라우드). num_features_init 게이트, depth 1–80 m 검증. Three.js + @react-three/{fiber@8, drei@9} 도입(React 18 호환), Step 6 lazy chunk로 분리 |
 | Phase E Step 7 (Frame Tracking) | ✅ 2026-04-26 — Step7 UI(prev/curr LK + init 전략 토글 `none`/`velocity` + velocity dx/dy 슬라이더 + maxIter sweep 차트). features WASM 재사용(C++ 추가 없음). 게이트: WASM 로드, prev+curr+calib 로드, tracked ≥ 50, 평균 dx ≈ −7 px (GT ± 2), 평균 \|dy\| ≤ 2 px. map-projection은 Step 8(PnP)에서 합류 |
+| Phase E Step 8 (Pose Estimation, PnP via g2o) | ✅ 2026-04-26 — `bind_pnp_spike`를 `myslam/bindings/bind_pnp.cpp`로 승격(`myslam_pnp.baseline.{js,wasm}` 88 KB + **391 KB**). 4-라운드 outlier 마킹 + RobustKernel drop-after-round + Huber δ 노출. 라운드별 inlier 마스크/chi² 분포를 노출해 Step 8 UI에서 라운드 슬라이더로 outlier 변화 애니메이션 시각화. `verify_pnp.ts` 14건 모두 통과 — 노이즈 없음 5건 + 1px 노이즈 3건 + 20% 시드 outlier 3건(recall 100%) + RobustKernel 토글 3건. cv::solvePnPRansac은 calib3d 모듈 추가 빌드 필요 → Phase E+로 deferred |
 | 현재 브랜치 | `ex` |
-| 마지막 커밋 | `527414b` (Phase D Step 5+6) → 본 작업 커밋 예정 |
+| 마지막 커밋 | `59dcd3c` (Phase E Step 7) → 본 작업 커밋 예정 |
 
 ---
 
@@ -46,9 +47,9 @@
 - [x] **Phase D** — Step 5~6 Triangulation + Initial Map ← 2026-04-26 완료
   - [x] Step 5 본 작업 — `bind_triangulation.cpp` (Eigen-only, JacobiSVD<4×4> + Midpoint), Step5 UI(top-down + depth histogram), invertedReturn 토글
   - [x] Step 6 본 작업 — Step6 UI(KeyFrame 카드 + r3f/drei Scene3D), num_features_init 게이트, lazy chunk 분리
-- [ ] **Phase E** — Step 7~8 Frame Tracking + PnP (진행 중)
+- [x] **Phase E** — Step 7~8 Frame Tracking + PnP ← 2026-04-26 완료
   - [x] Step 7 본 작업 — Step7 UI(prev/curr LK + init 전략 토글 + maxIter sweep 차트). features WASM 재사용 (C++ 신규 바인딩 없음)
-  - [ ] Step 8 본 작업 — `bind_pnp.cpp`(Phase A+ spike 승격) + 라운드별 outlier 시각화 + cv::solvePnPRansac 대체 경로
+  - [x] Step 8 본 작업 — `bind_pnp.cpp`(Phase A+ spike 승격) + 라운드별 outlier 시각화. cv::solvePnPRansac은 Phase E+로 deferred(calib3d 모듈 추가 빌드 필요)
 - [ ] **Phase F** — Step 9~10 Keyframe + New MapPoints
 - [ ] **Phase G** — Step 11 Bundle Adjustment (난이도 최상)
 - [ ] **Phase H** — Step 12~13 Sliding Window + Full Pipeline
@@ -67,7 +68,7 @@
 | 5. Triangulation | ✅ | ✅ | `myslam_triangulation.baseline` 28 KB (Eigen-only). Linear SVD + Midpoint + invertedReturn 토글. 게이트: WASM 로드, 좌/우+calib 로드, accepted ≥ 30, mean depth > 0 ∧ ≤ 100 m |
 | 6. Initial Map | ✅ | ✅ | Step6 UI: KF0 frustum + 초기 MapPoint 3D 뷰(r3f/drei). 게이트: WASM 로드, 좌/우+calib 로드, landmarks ≥ num_features_init(50), all depth > 0, depth 1–80 m |
 | 7. Frame Tracking | ✅ | ✅ | features WASM 재사용. prev/curr LK + init 전략 토글(`none`/`velocity`) + maxIter sweep 차트. 게이트: WASM 로드, prev+curr+calib, tracked ≥ 50, 평균 dx ≈ −7 px (합성 GT ± 2), 평균 &#124;dy&#124; ≤ 2 px |
-| 8. Pose Estimation (PnP) | ⬜ | ⬜ | |
+| 8. Pose Estimation (PnP) | ✅ | ✅ | `myslam_pnp.baseline` 391 KB. g2o LM 4-라운드 outlier 루프(rounds/iterPerRound/chi²/Huber δ/drop-after-round 슬라이더). Step 5/6/7 파이프라인 입력(prev L+R triangulation → curr L LK → 3D-2D pair). 게이트: WASM 3개 로드, prev+curr+calib, pair ≥ 30, inlier > 70% (PLAN §3 Step 8), final chi² 유한값. 라운드 슬라이더 + 막대차트로 outlier 변화 시각화 |
 | 9. Keyframe Decision | ⬜ | ⬜ | |
 | 10. New MapPoints | ⬜ | ⬜ | |
 | 11. Bundle Adjustment | ⬜ | ⬜ | |
@@ -111,6 +112,8 @@
 | 2026-04-26 | **3D 시각화 라이브러리: react-three-fiber v8 + drei v9 + three** 채택 | (1) PLAN §1.1은 Three.js를 명시. (2) 사용자 명시 요청(2026-04-26): "r3f, drei를 사용해 줘" → 선언적 React-방식이 r3f의 컨벤션. (3) v8 LTS는 React 18 peer 충족(v9는 React 19 강제). (4) Step 6 컴포넌트는 lazy chunk로 분리 → 초기 번들 gzip **94.86 KB** 유지(PLAN §10 ≤ 400 KB), Step 6 chunk만 249 KB gzip(전용 페이지 진입 시에만 로드) | Phase H(Step 13 Full Pipeline)의 trajectory + 실시간 포인트 클라우드도 같은 Scene3D 컴포넌트 재사용 예정. drei `<Grid/><OrbitControls/><Line/>` 활용 — 렌더 루프/카메라 컨트롤 직접 작성 없음 |
 | 2026-04-26 | **Step 7은 신규 C++ 바인딩 없이 features WASM 재사용** — `bind_features.trackLK`가 이미 `useInitialFlow`/`initialPts` 노출 | (1) ch13 `Frontend::TrackLastFrame`은 `cv::calcOpticalFlowPyrLK`를 호출하는 30줄 함수로, 본질적으로 같은 카메라 시간축 LK. Phase C에서 Step 4용으로 이미 만든 바인딩과 100% 동일 OpenCV 호출. (2) 차이는 입력 페어(좌→우 vs prev→curr)와 init 전략(고정 좌측 좌표 vs 시간 prior). 둘 다 TS 측에서 표현 가능. (3) Step 7만의 독립 WASM을 만들면 OpenCV 정적 라이브러리 약 8 MB가 또 한 번 링크돼 빌드 시간/디스크 footprint가 무의미하게 증가. | Phase E의 본 C++ 작업은 Step 8(PnP)에 집중 — 그쪽은 g2o 의존이라 features WASM에 합칠 수 없음 |
 | 2026-04-26 | **Step 7 init 전략은 `none` + `velocity` 2종으로 시작, `map-projection`은 Step 8 후 합류** | (1) PLAN §3 Step 7은 "map projection / 직전 위치 / 없음" 3종 토글을 요구. (2) 그러나 `map-projection`은 추정된 상대 pose가 있어야 의미 있는데, 현재 Step 7만 단독으로 존재할 때는 임의의 상대 pose를 손으로 입력하는 "fake projection"이 되어 학습 가치가 떨어진다. 사용자가 진짜로 보고 싶은 것은 **"PnP 추정 pose가 다음 프레임 LK init에 어떻게 흘러가는가"** — Step 8 완료 후 자연스럽게 통합. (3) 현재 2종(`none` = `useInitialFlow=false`, `velocity` = `useInitialFlow=true`+사용자 dx/dy)도 PLAN §3의 핵심 학습 포인트("초기치 전략별 수렴 라운드 수 비교 차트")를 충분히 시연 — maxIter sweep 차트로 두 곡선의 plateau 도달 속도 차이가 즉시 보임. (4) 합성 fixture는 프레임당 14 px 좌측 이동 → 0.5× downsample 시 GT dx = −7 px. velocity 슬라이더 default를 −7로 두어 학습자가 "GT와 일치할 때" → "벗어날 때"의 추적률 변화를 능동 관찰 | Step 8 완료 시 `map-projection` 버튼 활성화 + Step 7 ParamPanel 토글 추가 |
+| 2026-04-26 | **Step 8 PnP는 spike 승격 — Vertex/Edge는 100% 재사용, 라운드 루프만 ch13 Frontend::EstimateCurrentPose로 확장** | (1) Phase A+ Stage 1 spike(`bind_pnp_spike.cpp`)에서 `VertexPoseSE3`(Isometry3d 기반 left-update SE(3)) + `EdgeReprojectionPoseOnly`(2×6 해석 Jacobian) + `solver_dense` 조합이 GT-prior init에서 mrad/cm 정확도로 수렴함을 이미 검증했다. 본 바인딩에서 그 코드는 한 글자도 바뀌지 않는다. (2) 차이는 **라운드 루프**에서 발생: ch13 EstimateCurrentPose는 `4 × optimizer.optimize(10)`을 돌리며 매 라운드 후 `chi² > 5.991`인 엣지를 `setLevel(1)`(skip)로 마킹하고, round ≥ 2부터 RobustKernel을 떼어내 inlier 정밀도를 끌어올린다. (3) 본 바인딩은 이를 옵션화 — `rounds`/`iterPerRound`/`chi2Threshold`/`huberDelta`/`removeRobustAfterRound`/`useRobustKernel` 6개 노브. (4) 라운드별 inlier mask + 라운드별 chi² 값을 평탄 배열(R*N + i)로 노출 → UI는 라운드 슬라이더 한 개로 outlier 변화 애니메이션 구성, 추가 C++ 호출 비용 0 | `verify_pnp.ts` 14건 통과 (noiseless 5 + 1px 3 + 20% 시드 outlier 3 + 커널 토글 3). 시드된 outlier recall 100%. WASM 391 KB(spike 376 KB 대비 +4% — 라운드 메타 packF64/packU8/packI32 런타임만 추가) |
+| 2026-04-26 | **Step 8 cv::solvePnPRansac은 Phase E+로 deferred** | (1) PLAN §3 Step 8은 g2o 외에 `cv::solvePnPRansac`/`EPnP`/`DLS PnP` 3종 alt를 명시. (2) 그러나 `solvePnPRansac`은 OpenCV `calib3d` 모듈에 있고 현재 BUILD_LIST는 `core,imgproc,features2d,video`로 묶여 있어 OpenCV 재빌드(~5분)가 필요. (3) g2o 본 바인딩이 본 Step의 **핵심 산출물**(spike 승격 + 라운드 루프 + UI)이고, 추가 알고리즘은 학습자에게 비교 대상으로만 의미가 있다. (4) Phase F(Step 9/10)는 `calib3d` 의존 없음 → calib3d 추가는 Phase G BA 또는 별도 Phase E+에서 일괄 처리(EPnP/DLS도 calib3d에 포함). 본 PR에 포함시키면 OpenCV 분리 빌드 캐시가 무효화되어 본 작업 외 잡음이 늘어남 | Step 8 ParamPanel에 `cv::solvePnPRansac (Step 8+)`, `EPnP / DLS PnP` 두 disabled chip + tooltip 안내. Phase E+ 또는 F 후반에 calib3d를 BUILD_LIST에 추가하고 본 PnP 바인딩의 별도 함수로 추가 |
 
 ---
 
@@ -140,25 +143,29 @@
   - WASM Camera 바인딩: `ch13-wasm/wasm-src/myslam/bindings/bind_camera.cpp`
   - WASM Features 바인딩 (Step 3+4): `ch13-wasm/wasm-src/myslam/bindings/bind_features.cpp`
   - WASM Triangulation 바인딩 (Step 5+6): `ch13-wasm/wasm-src/myslam/bindings/bind_triangulation.cpp`
+  - WASM PnP 바인딩 (Step 8): `ch13-wasm/wasm-src/myslam/bindings/bind_pnp.cpp`
   - Phase A+ 스파이크: `ch13-wasm/wasm-src/spike/{bind_pnp_spike.cpp, bind_ba_spike.cpp, verify_pnp.mjs, verify_ba.mjs, verify_pnp_diag*.mjs}`
   - Phase C 게이트 스파이크: `ch13-wasm/wasm-src/spike/{bind_cv_spike.cpp, verify_cv.ts}` — `npm run verify:cv_spike`
   - Phase C 본 작업 검증: `ch13-wasm/wasm-src/spike/verify_features.ts` — `npm run verify:features`
   - Phase D 본 작업 검증: `ch13-wasm/wasm-src/spike/verify_triangulation.ts` — `npm run verify:triangulation`
-  - 빌드 스크립트: `ch13-wasm/wasm-src/{CMakeLists.txt, build.sh}` — `bash build.sh [baseline|simd|mt|mt-simd] [hello|camera|pnp_spike|ba_spike|cv_spike|features|triangulation]`
+  - Phase E 본 작업 검증: `ch13-wasm/wasm-src/spike/verify_pnp.ts` — `npm run verify:pnp` (verify_pnp.mjs는 Phase A+ 아카이브로 보존)
+  - 빌드 스크립트: `ch13-wasm/wasm-src/{CMakeLists.txt, build.sh}` — `bash build.sh [baseline|simd|mt|mt-simd] [hello|camera|pnp_spike|ba_spike|cv_spike|features|triangulation|pnp]`
   - OpenCV 분리 빌드 스크립트: `ch13-wasm/wasm-src/scripts/build-opencv.sh` — `npm run build:opencv:baseline`
   - g2o submodule (modern master): `ch13-wasm/wasm-src/third_party/g2o/`
   - Eigen submodule (tag 5.0.1): `ch13-wasm/wasm-src/third_party/eigen/`
   - OpenCV submodule (tag 4.13.0, shallow): `ch13-wasm/wasm-src/third_party/opencv/`
   - OpenCV 빌드 산출물: `ch13-wasm/wasm-src/build/opencv-{build,install}-<variant>/` (gitignored). install/lib에 `libopencv_{core,imgproc,features2d,video}.a`
-  - 빌드 산출물: `ch13-wasm/public/wasm/myslam_{hello,camera,pnp_spike,ba_spike,cv_spike,features,triangulation}.<variant>.{js,wasm}`
+  - 빌드 산출물: `ch13-wasm/public/wasm/myslam_{hello,camera,pnp_spike,ba_spike,cv_spike,features,triangulation,pnp}.<variant>.{js,wasm}`
   - Step 3 UI: `ch13-wasm/src/steps/Step03_FeatureDetection/`
   - Step 4 UI: `ch13-wasm/src/steps/Step04_StereoMatching/`
   - Step 5 UI: `ch13-wasm/src/steps/Step05_Triangulation/`
   - Step 6 UI: `ch13-wasm/src/steps/Step06_InitialMap/` (lazy chunk; r3f Scene3D)
   - Step 7 UI: `ch13-wasm/src/steps/Step07_FrameTracking/` (features WASM 재사용, prev/curr LK + init 전략 토글 + maxIter sweep 차트)
+  - Step 8 UI: `ch13-wasm/src/steps/Step08_PoseEstimation/` (features+triangulation+pnp 3-WASM 파이프라인, 라운드 슬라이더 + 막대차트)
   - 공통 Scene3D 컴포넌트: `ch13-wasm/src/components/Scene3D.tsx` (r3f + drei)
   - TS 로더: `ch13-wasm/src/wasm/features.ts` (`loadFeaturesWasm` + `imageDataToGray`)
   - TS 로더: `ch13-wasm/src/wasm/triangulation.ts` (`loadTriangulationWasm` + `makeK` + `makeRectifiedT`)
+  - TS 로더: `ch13-wasm/src/wasm/pnp.ts` (`loadPnPWasm` + `makeKMatrix` + `identityInit` + `makeInitPose6`)
 - (예정) 단계별 학습 노트: `docs/steps/NN-*.md`
 
 ---
@@ -527,6 +534,68 @@ PLAN §9 Phase C 1.5주 추정과 일치. 단, OpenCV.js 빌드 대신 **분리 
   1. `velocity dx` 슬라이더를 GT(−7)에서 ±20 px로 벗어나게 변경 → tracked count가 점진적 → 급격하게 감소.
   2. `init strategy` 토글 `none` ↔ `velocity` 시 maxIter sweep 차트의 녹색(velocity) 곡선이 적색(none)보다 좌측에서 빨리 plateau에 도달하는지.
   3. curr frame 슬라이더(#0→#1, …, #3→#4)로 어느 페어든 평균 dx ≈ −7 px이 안정적으로 나오는지.
+
+---
+
+## Phase E — Step 8 본 작업 완료 (2026-04-26)
+
+### 결과 요약
+
+| 항목 | 값 |
+|------|-----|
+| 신규 C++ | `wasm-src/myslam/bindings/bind_pnp.cpp` (~330 LOC). spike의 `VertexPoseSE3` + `EdgeReprojectionPoseOnly`를 그대로 가져와 `estimatePose(points3dFlat, obs2dFlat, kRowMajor, initPose6, opts)` 단일 함수로 노출. ch13 EstimateCurrentPose의 4-라운드 outlier 루프(`setLevel(1)` + `chi² > 5.991` + RobustKernel detach round ≥ 2) 그대로 재현 |
+| 옵션 노브 | `rounds` (def 4) · `iterPerRound` (def 10) · `chi2Threshold` (def 5.991) · `huberDelta` (def √5.991) · `removeRobustAfterRound` (def 2) · `useRobustKernel` (def true) |
+| 라운드별 노출 | `roundInlierMasks` (R*N uint8) · `roundChi2Values` (R*N f64) · `roundChi2Sum` (R f64) · `roundInlierCount` (R int32) · `roundIters` (R int32) — UI는 라운드 슬라이더 1개로 outlier 변화 애니메이션 구성 |
+| WASM 크기 | `myslam_pnp.baseline.{js,wasm}` = 88 KB + **391 KB**. spike 376 KB 대비 +4% (라운드 메타 packF64/packU8/packI32 런타임만 추가, g2o core/stuff/solver_dense는 동일) |
+| 빌드 시간 | 단일 .cpp → ~6초 (g2o submodule는 캐시 재사용) |
+
+### `verify_pnp.ts` 검증 결과 (`npm run verify:pnp`)
+
+| 그룹 | 케이스 | 결과 |
+|------|--------|------|
+| Stage 1 noiseless (N=40) | seed 1..5 | 5/5 PASS — rotErr 0, trErr ≤ 5.6e-13 (machine precision) |
+| Stage 1 1px noise (N=80) | seed 10..12 | 3/3 PASS — rotErr ≤ 1.4e-3 rad, trErr ≤ 1.2e-3 |
+| Body 20% seeded outliers (N=100, 60px shift) | seed 20..22 | 3/3 PASS — **outlier recall 100% (15..20/15..20)** |
+| Body RobustKernel 토글 (3종) | drop=4 / kernel=off / drop=0 | 3/3 PASS — 동일 수치 수렴 |
+
+### Step 8 — Pose Estimation (PnP) UI
+
+- 입력 파이프라인: prev (left+right) → GFTT → stereo LK → Linear-SVD triangulation → 3D points (left = world). prev-left → curr-left LK → 2D obs. 3D ↔ 2D 페어로 PnP. **features+triangulation+pnp 3-WASM이 동시에 메모리에 상주**해 한 화면에서 Step 3/4/5/7의 결과가 모두 흘러간다.
+- ParamPanel: rounds(1..6), iterPerRound(1..20), chi²(0.5..20), Huber δ(0.1..10), drop-after-round(0..rounds), RobustKernel 체크박스, maxFeatures(20..500). cv::solvePnPRansac/EPnP/DLS는 **disabled chip + tooltip "available once calib3d is added"** — Phase E+로 명시적 deferred.
+- OutputView: curr left 이미지 위 inlier(녹색)/outlier(빨강) 점 — **라운드 슬라이더로 라운드 1..R의 마스크를 한 번에 토글**하여 책의 4-라운드 outlier 제거 과정을 단계별 시각 관찰. 라운드별 inlier 카운트 막대차트(클릭 시 슬라이더 동기화) + 추정 pose 텍스트(rotation deg, translation x/y/z) + 단계별 ms.
+- VerifyGate (4종):
+  1. features + triangulation + pnp WASM 모두 로드
+  2. prev (L+R) + curr (L) + calib 로드
+  3. 3D-2D 페어 ≥ 30
+  4. **inlier 비율 > 70% (PLAN §3 Step 8 명시)**
+  5. final chi² 유한값
+
+### 빌드/번들 검증
+
+| 항목 | 관측값 |
+|------|--------|
+| `npm run build:wasm:pnp` | ✅ `myslam_pnp.baseline.wasm` 391 KB |
+| `npm run verify:pnp` | ✅ 14건 모두 통과 |
+| `npx tsc -b` | ✅ 0 errors |
+| `npm run build` | ✅ 초기 chunk **100.55 KB gzipped** (PLAN §10 ≤ 400 KB), Step 6 lazy chunk 249.03 KB gzip (변동 없음) |
+| `GET /step/pose-estimation` | 200 text/html, COEP/COOP 반영 |
+| `GET /wasm/myslam_pnp.baseline.{js,wasm}` | 200, COEP/COOP 반영, .wasm은 application/wasm |
+
+### 의식적으로 deferred (Phase E+ 또는 Phase F 후반)
+
+- **`cv::solvePnPRansac` / EPnP / DLS PnP** — calib3d 모듈 추가 + OpenCV 재빌드 필요. 본 PR에 포함하면 OpenCV 분리 빌드 캐시 무효화로 잡음 증가. ParamPanel에 disabled chip + tooltip으로 학습자에게 명시.
+- **Step 7 `map-projection` 활성화** — Step 8 PnP가 추정한 상대 pose를 다음 프레임 LK init으로 흘리는 통합. Step 7 ParamPanel 토글 + Step 7 ↔ Step 8 사이 영속 상태(Map 매니저)는 Phase F(Step 9~10) 도입 시 같이 처리.
+- **연속 10프레임 포즈 궤적 스무딩** (PLAN §3 Step 8 보조 검증) — 현재 KITTI mini fixture는 5프레임이라 Step 13 Full Pipeline에서 자연스럽게 합류.
+- **벤치 차트 + perfMeter 통합** — PerfMeter가 stub인 채라 PerfMeter 본 구현 시점에 추가.
+- **Phase C+ SIMD/MT variant** — Phase G BA spike 후 일괄 도입 결정 유지.
+
+### 남은 사용자 육안 관측
+
+- `http://localhost:5173/step/pose-estimation`:
+  1. 라운드 슬라이더를 R1 → R4로 움직이면 빨강 점이 줄어들고 녹색 점이 자리잡는지 (책의 outlier 정제 과정).
+  2. `chi² threshold` 슬라이더를 1.0 → 20.0으로 올리면 inlier 수가 늘어나면서 추정 pose가 어떻게 변하는지.
+  3. `RobustKernel` 체크박스를 끄면 첫 라운드부터 LM이 outlier에 잡혀끌리는지 — 라운드별 inlier 카운트 막대 변화.
+  4. `drop after round=0` (kernel 즉시 떼기)와 `drop after round=4` (끝까지 유지) 사이 정확도 차이.
 
 ---
 

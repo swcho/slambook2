@@ -18,6 +18,7 @@ endif()
 #   cv_spike      (Phase C gate)     — minimal OpenCV smoke test
 #   features      (Phase C / Step 3+4) — GFTT/Harris/FAST/ORB + LK binding
 #   triangulation (Phase D / Step 5)   — Linear SVD + Midpoint triangulation
+#   pnp           (Phase E / Step 8)   — pose-only PnP via g2o (4-round outlier)
 if(NOT DEFINED CH13_WASM_TARGET)
   set(CH13_WASM_TARGET "hello")
 endif()
@@ -129,10 +130,15 @@ function(_ch13_setup_eigen)
 endfunction()
 
 # -----------------------------------------------------------------------------
-# Targets: pnp_spike (Stage 1) and ba_spike (Stage 2) — Phase A+ gate.
-# Share the same g2o setup; only the binding cpp and link-library list differ.
+# Targets: pnp_spike (Stage 1), ba_spike (Stage 2), pnp (Phase E body).
+# All three share the same g2o + Eigen submodule setup; only the binding cpp,
+# export name, and link-library list differ. The pnp body target promotes the
+# spike's Vertex/Edge code into myslam/bindings/bind_pnp.cpp with per-round
+# outlier tracking on top.
 # -----------------------------------------------------------------------------
-if(CH13_WASM_TARGET STREQUAL "pnp_spike" OR CH13_WASM_TARGET STREQUAL "ba_spike")
+if(CH13_WASM_TARGET STREQUAL "pnp_spike" OR
+   CH13_WASM_TARGET STREQUAL "ba_spike" OR
+   CH13_WASM_TARGET STREQUAL "pnp")
   # ch13-wasm-owned submodule (modern g2o master) — intentionally decoupled
   # from the book's pinned 3rdparty/g2o (2018) to stay compatible with a
   # modern Eigen + CMake.
@@ -220,6 +226,15 @@ if(CH13_WASM_TARGET STREQUAL "pnp_spike" OR CH13_WASM_TARGET STREQUAL "ba_spike"
       spike/bind_ba_spike.cpp
       createBaSpikeModule
       "core;stuff;solver_eigen")
+  endif()
+
+  if(CH13_WASM_TARGET STREQUAL "pnp")
+    # Phase E / Step 8 body. Same g2o link surface as pnp_spike (dense linear
+    # solver — pose-only PnP has a single 6×6 block).
+    _add_spike_target(myslam_pnp
+      myslam/bindings/bind_pnp.cpp
+      createPnpModule
+      "core;stuff;solver_dense")
   endif()
 endif()
 
