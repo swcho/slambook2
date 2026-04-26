@@ -5,7 +5,7 @@
 
 - **시작일**: 2026-04-17
 - **최근 갱신**: 2026-04-26
-- **현재 진행 중**: **Phase E 완료(2026-04-26)** — Step 8(Pose Estimation, PnP via g2o) 본 바인딩 + 4-라운드 outlier 시각화 + Step 8 UI 모두 통과. 다음: **Phase F** — Step 9(Keyframe Decision) + Step 10(New MapPoints via Keyframe).
+- **현재 진행 중**: **Phase F 완료(2026-04-26)** — Step 9(Keyframe Decision, 3 정책) + Step 10(New MapPoints via Keyframe, 마스크 토글 + 3D 시각화) 모두 통과. 다음: **Phase G** — Step 11(Bundle Adjustment) — 가장 난이도 높음.
 
 ---
 
@@ -27,8 +27,10 @@
 | Phase D Step 6 (Initial Map) | ✅ 2026-04-26 — Step6 UI(KeyFrame 카드 + r3f Scene3D: 좌/우 frustum + 초기 MapPoint 클라우드). num_features_init 게이트, depth 1–80 m 검증. Three.js + @react-three/{fiber@8, drei@9} 도입(React 18 호환), Step 6 lazy chunk로 분리 |
 | Phase E Step 7 (Frame Tracking) | ✅ 2026-04-26 — Step7 UI(prev/curr LK + init 전략 토글 `none`/`velocity` + velocity dx/dy 슬라이더 + maxIter sweep 차트). features WASM 재사용(C++ 추가 없음). 게이트: WASM 로드, prev+curr+calib 로드, tracked ≥ 50, 평균 dx ≈ −7 px (GT ± 2), 평균 \|dy\| ≤ 2 px. map-projection은 Step 8(PnP)에서 합류 |
 | Phase E Step 8 (Pose Estimation, PnP via g2o) | ✅ 2026-04-26 — `bind_pnp_spike`를 `myslam/bindings/bind_pnp.cpp`로 승격(`myslam_pnp.baseline.{js,wasm}` 88 KB + **391 KB**). 4-라운드 outlier 마킹 + RobustKernel drop-after-round + Huber δ 노출. 라운드별 inlier 마스크/chi² 분포를 노출해 Step 8 UI에서 라운드 슬라이더로 outlier 변화 애니메이션 시각화. `verify_pnp.ts` 14건 모두 통과 — 노이즈 없음 5건 + 1px 노이즈 3건 + 20% 시드 outlier 3건(recall 100%) + RobustKernel 토글 3건. cv::solvePnPRansac은 calib3d 모듈 추가 빌드 필요 → Phase E+로 deferred |
+| Phase F Step 9 (Keyframe Decision) | ✅ 2026-04-26 — Step9 UI(3 정책 토글: inlier-count / motion / hybrid). i → i+1 transition마다 Step 7+8 파이프라인을 재사용해 tracking_inliers/||t||/rot 산출, KF 결정 막대차트 + 표 + 임계값 점선. WASM 신규 없음. 게이트: 3 WASM 로드 + 모든 4 transition PnP 수렴 + 정책이 ≥1 KF 트리거 (PLAN §3 "5–15%"는 long-sequence 기준이라 mini fixture에선 학습용 게이트로 완화) |
+| Phase F Step 10 (New MapPoints via Keyframe) | ✅ 2026-04-26 — Step10 UI(redetect 모드 토글: mask-existing(±10 box, ch13 default) / full-redetect). frame 0 stereo+temporal 결과로 carry-over set 시뮬레이션, 새 KF에서 GFTT 마스크 재검출 → stereo LK → linear-SVD triangulation. 2D 오버레이(청록=carry, 노랑=new) + r3f Scene3D(좌/우 frustum + 두 색상 포인트 클라우드) + 4 KF 후보에 대한 carry/new 누적 막대차트. WASM 신규 없음(features+triangulation 재사용). lazy chunk로 분리(Scene3D 기존 chunk 공유). 게이트: 2 WASM + frame 0/i + calib + new ≥ 10 + depth 1–80 m |
 | 현재 브랜치 | `ex` |
-| 마지막 커밋 | `59dcd3c` (Phase E Step 7) → 본 작업 커밋 예정 |
+| 마지막 커밋 | `0c9b06e` (Phase E Step 8) → 본 작업 커밋 예정 |
 
 ---
 
@@ -50,7 +52,9 @@
 - [x] **Phase E** — Step 7~8 Frame Tracking + PnP ← 2026-04-26 완료
   - [x] Step 7 본 작업 — Step7 UI(prev/curr LK + init 전략 토글 + maxIter sweep 차트). features WASM 재사용 (C++ 신규 바인딩 없음)
   - [x] Step 8 본 작업 — `bind_pnp.cpp`(Phase A+ spike 승격) + 라운드별 outlier 시각화. cv::solvePnPRansac은 Phase E+로 deferred(calib3d 모듈 추가 빌드 필요)
-- [ ] **Phase F** — Step 9~10 Keyframe + New MapPoints
+- [x] **Phase F** — Step 9~10 Keyframe + New MapPoints ← 2026-04-26 완료
+  - [x] Step 9 본 작업 — Step9 UI(3 정책 토글 + tracking_inliers 막대차트 + 결정 표). features+triangulation+pnp WASM 재사용 (C++ 신규 바인딩 없음)
+  - [x] Step 10 본 작업 — Step10 UI(carry-over 마스크 ±10 vs full-redetect + 4 KF sequence 차트 + r3f Scene3D). features+triangulation WASM 재사용 (C++ 신규 바인딩 없음). 영속 KeyFrame/MapPoint 모델은 Phase H Map 매니저로 deferred
 - [ ] **Phase G** — Step 11 Bundle Adjustment (난이도 최상)
 - [ ] **Phase H** — Step 12~13 Sliding Window + Full Pipeline
 - [ ] **Phase I** — a11y·모바일·문서·Playwright 스모크
@@ -69,8 +73,8 @@
 | 6. Initial Map | ✅ | ✅ | Step6 UI: KF0 frustum + 초기 MapPoint 3D 뷰(r3f/drei). 게이트: WASM 로드, 좌/우+calib 로드, landmarks ≥ num_features_init(50), all depth > 0, depth 1–80 m |
 | 7. Frame Tracking | ✅ | ✅ | features WASM 재사용. prev/curr LK + init 전략 토글(`none`/`velocity`) + maxIter sweep 차트. 게이트: WASM 로드, prev+curr+calib, tracked ≥ 50, 평균 dx ≈ −7 px (합성 GT ± 2), 평균 &#124;dy&#124; ≤ 2 px |
 | 8. Pose Estimation (PnP) | ✅ | ✅ | `myslam_pnp.baseline` 391 KB. g2o LM 4-라운드 outlier 루프(rounds/iterPerRound/chi²/Huber δ/drop-after-round 슬라이더). Step 5/6/7 파이프라인 입력(prev L+R triangulation → curr L LK → 3D-2D pair). 게이트: WASM 3개 로드, prev+curr+calib, pair ≥ 30, inlier > 70% (PLAN §3 Step 8), final chi² 유한값. 라운드 슬라이더 + 막대차트로 outlier 변화 시각화 |
-| 9. Keyframe Decision | ⬜ | ⬜ | |
-| 10. New MapPoints | ⬜ | ⬜ | |
+| 9. Keyframe Decision | ✅ | ✅ | features+triangulation+pnp WASM 재사용. 3 정책 토글: inlier-count(ch13), motion(||t||/rot 임계), hybrid. 모든 4 transition마다 Step 7+8 파이프라인 자동 실행 → tracking_inliers 막대차트 + 결정 표. 게이트: 3 WASM 로드, 4 frames+calib 로드, 4/4 PnP 수렴, ≥1 KF 트리거(PLAN §3 "KF 5–15%"는 long-sequence 기준이라 mini fixture에선 학습용 게이트로 완화) |
+| 10. New MapPoints | ✅ | ✅ | features+triangulation WASM 재사용. mask-existing(±10 box, ch13) vs full-redetect 토글, 마스크 반경 슬라이더. carry-over set은 frame 0 stereo+temporal로 시뮬레이션. 2D 오버레이(청록 carry / 노랑 new) + r3f Scene3D + 4 KF 후보에 대한 carry/new 막대차트. 게이트: 2 WASM 로드, frame 0+i+calib 로드, new ≥ 10, depth ∈ [1, 80] m |
 | 11. Bundle Adjustment | ⬜ | ⬜ | |
 | 12. Sliding Window | ⬜ | ⬜ | |
 | 13. Full Pipeline | ⬜ | ⬜ | |
@@ -114,6 +118,9 @@
 | 2026-04-26 | **Step 7 init 전략은 `none` + `velocity` 2종으로 시작, `map-projection`은 Step 8 후 합류** | (1) PLAN §3 Step 7은 "map projection / 직전 위치 / 없음" 3종 토글을 요구. (2) 그러나 `map-projection`은 추정된 상대 pose가 있어야 의미 있는데, 현재 Step 7만 단독으로 존재할 때는 임의의 상대 pose를 손으로 입력하는 "fake projection"이 되어 학습 가치가 떨어진다. 사용자가 진짜로 보고 싶은 것은 **"PnP 추정 pose가 다음 프레임 LK init에 어떻게 흘러가는가"** — Step 8 완료 후 자연스럽게 통합. (3) 현재 2종(`none` = `useInitialFlow=false`, `velocity` = `useInitialFlow=true`+사용자 dx/dy)도 PLAN §3의 핵심 학습 포인트("초기치 전략별 수렴 라운드 수 비교 차트")를 충분히 시연 — maxIter sweep 차트로 두 곡선의 plateau 도달 속도 차이가 즉시 보임. (4) 합성 fixture는 프레임당 14 px 좌측 이동 → 0.5× downsample 시 GT dx = −7 px. velocity 슬라이더 default를 −7로 두어 학습자가 "GT와 일치할 때" → "벗어날 때"의 추적률 변화를 능동 관찰 | Step 8 완료 시 `map-projection` 버튼 활성화 + Step 7 ParamPanel 토글 추가 |
 | 2026-04-26 | **Step 8 PnP는 spike 승격 — Vertex/Edge는 100% 재사용, 라운드 루프만 ch13 Frontend::EstimateCurrentPose로 확장** | (1) Phase A+ Stage 1 spike(`bind_pnp_spike.cpp`)에서 `VertexPoseSE3`(Isometry3d 기반 left-update SE(3)) + `EdgeReprojectionPoseOnly`(2×6 해석 Jacobian) + `solver_dense` 조합이 GT-prior init에서 mrad/cm 정확도로 수렴함을 이미 검증했다. 본 바인딩에서 그 코드는 한 글자도 바뀌지 않는다. (2) 차이는 **라운드 루프**에서 발생: ch13 EstimateCurrentPose는 `4 × optimizer.optimize(10)`을 돌리며 매 라운드 후 `chi² > 5.991`인 엣지를 `setLevel(1)`(skip)로 마킹하고, round ≥ 2부터 RobustKernel을 떼어내 inlier 정밀도를 끌어올린다. (3) 본 바인딩은 이를 옵션화 — `rounds`/`iterPerRound`/`chi2Threshold`/`huberDelta`/`removeRobustAfterRound`/`useRobustKernel` 6개 노브. (4) 라운드별 inlier mask + 라운드별 chi² 값을 평탄 배열(R*N + i)로 노출 → UI는 라운드 슬라이더 한 개로 outlier 변화 애니메이션 구성, 추가 C++ 호출 비용 0 | `verify_pnp.ts` 14건 통과 (noiseless 5 + 1px 3 + 20% 시드 outlier 3 + 커널 토글 3). 시드된 outlier recall 100%. WASM 391 KB(spike 376 KB 대비 +4% — 라운드 메타 packF64/packU8/packI32 런타임만 추가) |
 | 2026-04-26 | **Step 8 cv::solvePnPRansac은 Phase E+로 deferred** | (1) PLAN §3 Step 8은 g2o 외에 `cv::solvePnPRansac`/`EPnP`/`DLS PnP` 3종 alt를 명시. (2) 그러나 `solvePnPRansac`은 OpenCV `calib3d` 모듈에 있고 현재 BUILD_LIST는 `core,imgproc,features2d,video`로 묶여 있어 OpenCV 재빌드(~5분)가 필요. (3) g2o 본 바인딩이 본 Step의 **핵심 산출물**(spike 승격 + 라운드 루프 + UI)이고, 추가 알고리즘은 학습자에게 비교 대상으로만 의미가 있다. (4) Phase F(Step 9/10)는 `calib3d` 의존 없음 → calib3d 추가는 Phase G BA 또는 별도 Phase E+에서 일괄 처리(EPnP/DLS도 calib3d에 포함). 본 PR에 포함시키면 OpenCV 분리 빌드 캐시가 무효화되어 본 작업 외 잡음이 늘어남 | Step 8 ParamPanel에 `cv::solvePnPRansac (Step 8+)`, `EPnP / DLS PnP` 두 disabled chip + tooltip 안내. Phase E+ 또는 F 후반에 calib3d를 BUILD_LIST에 추가하고 본 PnP 바인딩의 별도 함수로 추가 |
+| 2026-04-26 | **Phase F는 신규 C++ 바인딩 없이 UI-only로 완성** — Step 9/10 모두 features+triangulation+pnp WASM을 그대로 재사용 | (1) ch13 InsertKeyframe / TriangulateNewPoints는 입력 데이터(tracking_inliers, 상대 pose, 좌측 이미지 + 마스크)를 받아 결정/재삼각화하는 정책 함수 — Step 7/8에서 이미 노출한 파이프라인 산출물의 후처리. (2) features WASM이 이미 `mask: Uint8Array` 인자를 받음 → ch13 `cv::rectangle` 마스크와 같은 의미를 TS에서 원형 mask 빌더로 충분히 재현 가능. (3) Step 9는 책의 단일 정책(inlier-count) 외에 **motion / hybrid 두 정책을 추가로 토글**해 PLAN §3 "교체 가능 알고리즘" 요구를 만족. covariance 정책은 BA 후 landmark uncertainty가 있어야 의미 있어 Phase G 의존으로 disabled chip 유지. (4) Step 10은 carry-over set을 frame 0의 stereo triangulation + temporal LK survival로 시뮬레이션 — 영속 MapPoint 모델은 Phase H의 Map 매니저로 자연스럽게 합류. mask-existing vs full-redetect 토글이 책의 ±10 box 마스크 효과를 직접 비교하게 한다. | Phase G(BA)에서도 동일 패턴: WASM은 `bind_ba.cpp` 하나만 추가하고 정책 슬라이더/시각화는 TS에서 처리. 영속 KeyFrame/MapPoint 데이터 모델은 Phase H에서 Step 12(슬라이딩 윈도우)와 같이 도입 — Step 9/10은 그 시점에 stateful 사용자 흐름(여러 KF 누적, 제거)으로 확장 |
+| 2026-04-26 | **Step 9 게이트 완화: PLAN §3 "KF 비율 5–15%"는 학습용 ≥1 KF로 대체** | (1) PLAN의 5–15% 기준은 KITTI 05 전체 시퀀스(2761 프레임)를 가정한 통계. mini fixture는 5 프레임 → transition 4개 → 비율은 0/25/50/75/100%로 양자화. (2) "정책이 의미 있게 발화한다"가 본질적 학습 목표 — 슬라이더로 임계값을 조정해 KF 결정이 점진적으로 변하는 모습이 게이트 통과 신호. (3) ≥1 KF + ≤100% 두 조건만 자동 검증, 비율 자체는 표시만. | Phase H Step 13(Full Pipeline)에서 KITTI mini의 모든 5 프레임을 누적 처리할 때 비율 게이트 부활 — 그 때는 5–15% 직접 검증 가능 |
+| 2026-04-26 | **Step 10 carry-over set 시뮬레이션 방식: frame 0 stereo + frame 0 → frame[i] LK survival** | (1) ch13에서 carry-over는 직전 KF의 영속 MapPoint를 현재 프레임에 투영해 trackLastFrame(LK) 결과로 살아남은 점들. mini fixture에서는 영속 Map 매니저가 없어 직접 시뮬: frame 0의 stereo+triangulate → 3D 점 set → LK frame 0 left → frame[i] left에서 살아남은 점을 carry-over로 정의. (2) 이 시뮬레이션은 frame 0 카메라 frame과 frame[i] 카메라 frame의 차이를 무시 — mini fixture는 합성 fixture로 거의 같은 frame이라 OK. 실제 KITTI에서는 Step 8 PnP의 상대 pose로 carry-over 3D 좌표를 transform 해야 함. (3) Phase H에서 영속 Map이 들어오면 carry-over는 그냥 Map.GetActiveMapPoints() 호출로 대체. | Phase H Step 12 슬라이딩 윈도우 + Step 13 Full Pipeline에서 영속 Map이 들어올 때 Step 10 컴포넌트의 carry-over 입력을 그쪽으로 교체. 본 Phase F의 시뮬레이션 코드는 그대로 유지하되 toggle("simulated carry-over (Phase F)" / "active map (Phase H+)")로 비교 가능하게 만들 예정 |
 
 ---
 
@@ -162,6 +169,8 @@
   - Step 6 UI: `ch13-wasm/src/steps/Step06_InitialMap/` (lazy chunk; r3f Scene3D)
   - Step 7 UI: `ch13-wasm/src/steps/Step07_FrameTracking/` (features WASM 재사용, prev/curr LK + init 전략 토글 + maxIter sweep 차트)
   - Step 8 UI: `ch13-wasm/src/steps/Step08_PoseEstimation/` (features+triangulation+pnp 3-WASM 파이프라인, 라운드 슬라이더 + 막대차트)
+  - Step 9 UI: `ch13-wasm/src/steps/Step09_KeyframeDecision/` (3 WASM 재사용, 3 정책 토글 + tracking_inliers 막대차트 + 결정 표)
+  - Step 10 UI: `ch13-wasm/src/steps/Step10_NewMapPoints/` (lazy chunk; features+triangulation 재사용, mask 토글 + 4 KF 시퀀스 차트 + r3f Scene3D)
   - 공통 Scene3D 컴포넌트: `ch13-wasm/src/components/Scene3D.tsx` (r3f + drei)
   - TS 로더: `ch13-wasm/src/wasm/features.ts` (`loadFeaturesWasm` + `imageDataToGray`)
   - TS 로더: `ch13-wasm/src/wasm/triangulation.ts` (`loadTriangulationWasm` + `makeK` + `makeRectifiedT`)
@@ -596,6 +605,79 @@ PLAN §9 Phase C 1.5주 추정과 일치. 단, OpenCV.js 빌드 대신 **분리 
   2. `chi² threshold` 슬라이더를 1.0 → 20.0으로 올리면 inlier 수가 늘어나면서 추정 pose가 어떻게 변하는지.
   3. `RobustKernel` 체크박스를 끄면 첫 라운드부터 LM이 outlier에 잡혀끌리는지 — 라운드별 inlier 카운트 막대 변화.
   4. `drop after round=0` (kernel 즉시 떼기)와 `drop after round=4` (끝까지 유지) 사이 정확도 차이.
+
+---
+
+## Phase F — Step 9/10 본 작업 완료 (2026-04-26)
+
+### 결과 요약
+
+| 항목 | 값 |
+|------|-----|
+| 신규 C++ | 없음 (Step 9 = features+triangulation+pnp 재사용 / Step 10 = features+triangulation 재사용 + TS 마스크 빌더) |
+| Step 9 신규 TS UI | `src/steps/Step09_KeyframeDecision/index.tsx` (~590 LOC) |
+| Step 10 신규 TS UI | `src/steps/Step10_NewMapPoints/index.tsx` (~640 LOC) — lazy chunk로 분리(Scene3D 공유) |
+| Step 9 정책 | `inlier-count`(ch13 default), `motion`(||t||/rot 임계), `hybrid`(union) — `covariance`는 BA 종속이라 disabled chip + tooltip "Step 11+" |
+| Step 10 재검출 모드 | `mask-existing`(±10 px 원형 마스크, ch13의 `cv::rectangle(±10 box)`와 의미 동등) / `full-redetect` |
+| Step 10 깊이 게이트 | `depthMin`(default 1 m) ≤ z ≤ `depthMax`(default 80 m) — PLAN §3 "depth 합리성 범위" 직접 노출 |
+
+### 빌드/번들 검증 (2026-04-26)
+
+| 항목 | 관측값 |
+|------|--------|
+| `npx tsc -b` | ✅ 0 errors (Step 9/10 추가 후) |
+| `npm run build` | ✅ 초기 chunk **103.83 KB gzipped** (PLAN §10 ≤ 400 KB 충족), Scene3D vendor chunk 245.91 KB gzip — Step 6 / Step 10이 공유 |
+| `GET /step/keyframe`, `/step/new-mappoints` | 200 text/html, COEP/COOP 반영 (vite dev) |
+| `GET /wasm/myslam_features.baseline.wasm` | 200 application/wasm, 1 143 809 B |
+| `GET /wasm/myslam_triangulation.baseline.wasm` | 200 application/wasm, 28 485 B |
+| `GET /wasm/myslam_pnp.baseline.wasm` | 200 application/wasm, 400 662 B (Step 8 산출물 재사용; PROGRESS의 391 KB는 KB 환산 표기 — 실제 .wasm 정확히 391.27 KiB) |
+
+### Step 9 — Keyframe Decision (UI)
+
+- **파이프라인**: 4개 transition(`#0→#1`, `#1→#2`, `#2→#3`, `#3→#4`)마다 Step 7+8 미니 파이프라인(detect prev L → stereo LK prev L→R → triangulate → temporal LK prev L → curr L → PnP)을 실행. 결과 `tracking_inliers`/`||t||`/`rotationDeg`은 `params.maxFeatures` 변경에만 재계산되도록 `useMemo`로 캐시.
+- **정책 토글**: `inlier-count`(`tracking_inliers < num_features_needed_for_keyframe`), `motion`(`||t|| > threshold` ∨ `rot > threshold`), `hybrid`(union). 각 임계값 슬라이더는 정책에 맞춰 disabled 처리(예: `inlier` 정책에서는 motion 슬라이더 비활성).
+- **시각화**: `tracking_inliers per transition` 막대차트 + 임계값 점선 + KF로 결정된 막대에 ★ 마커. 결정 표(transition · inliers · ||t|| · rot · PnP ms · KF? · reason).
+- **VerifyGate**:
+  1. features + triangulation + pnp WASM 로드
+  2. 5 frames + calib 로드
+  3. 모든 4 transition에서 PnP 수렴
+  4. 정책이 ≥ 1 KF 트리거 (학습 게이트)
+  5. KF 비율 ≤ 100% (sanity)
+
+### Step 10 — New MapPoints via Keyframe (UI)
+
+- **파이프라인**:
+  1. **Carry-over set**: frame 0 left에서 GFTT 검출 → frame 0 stereo LK → linear-SVD triangulation → temporal LK frame 0 left → frame[i] left. stereo + temporal 둘 다 성공한 점이 carry-over.
+  2. **Mask 빌더**(TS): `buildCircleMask(w, h, carryPts2d, radius)` — features WASM의 `mask: Uint8Array` 인자에 그대로 전달 (ch13의 `cv::rectangle(255-fill mask, pt±10)` 의미 동등, 원형 vs 사각형 차이만).
+  3. **신규 검출**: frame[i] left에서 GFTT(+optional mask) → frame[i] stereo LK → linear-SVD triangulation → depth band 필터(default 1–80 m).
+- **출력**:
+  - 2D 오버레이: 청록(`rgba(95,207,235)`) = carry-over 위치, 노랑(`rgba(244,208,74)`) = 새 검출.
+  - r3f Scene3D: KF camera frame 기준 좌측(녹색)/우측(파랑) frustum + 같은 색상 코드의 포인트 클라우드(stride 3 Float32Array, vertexColors).
+  - 시퀀스 막대차트: 4 KF 후보(`#0→#1`, …, `#0→#4`) 각각의 carry/new 누적 — 활성 KF는 1.0 opacity, 나머지 0.7.
+- **VerifyGate**:
+  1. features + triangulation WASM 로드
+  2. frame 0 + 새 KF 프레임 + calib 로드
+  3. 새 MapPoint 수 ≥ 10
+  4. 새 MapPoint depth ∈ [`depthMin`, `depthMax`] m
+
+### 의식적으로 deferred (Phase H로)
+
+- **영속 MapPoint 모델**: Step 9/10 모두 단일 화면 view-only로 구성. 실제 KeyFrame/MapPoint 누적은 Phase H Step 12(슬라이딩 윈도우) Map 매니저 도입 시점에 통합. Step 10 carry-over set은 frame 0 stereo로 시뮬레이션 중 — Phase H에서 `Map.GetActiveMapPoints()`로 교체.
+- **`covariance` 정책 (Step 9)**: landmark uncertainty propagation은 Phase G(BA) 결과에 의존 → Step 9 ParamPanel의 disabled chip + tooltip "Step 11+"로 명시.
+- **모션 정책의 회전 단위 검증**: 합성 fixture는 회전이 거의 0°라 motion 정책의 회전 임계값은 슬라이더로 0.1°까지 내려야 발화. 실제 KITTI에서는 default 1.5°가 합리적임.
+- **학습 노트** `docs/steps/{09,10}-*.md` — Phase I 마감 단계.
+
+### 남은 사용자 육안 관측
+
+- `http://localhost:5173/step/keyframe`:
+  1. `policy` 토글 inlier→motion→hybrid에서 결정 표의 `KF?` 컬럼 + 막대차트 ★ 마커가 어떻게 변하는지.
+  2. `inlier threshold`를 250으로 올리면 모든 transition이 KF가 되는지(상한 sanity 검증).
+  3. `motion` 정책에서 회전 임계 0.1° → 5°로 올렸을 때 발화 변화.
+- `http://localhost:5173/step/new-mappoints`:
+  1. `redetect` 토글 mask-existing↔full-redetect 시 노랑 점이 청록 점과 겹치는지/안 겹치는지(마스크 효과).
+  2. `mask radius` 30 px → 2 px로 줄였을 때 새 검출이 carry-over 코너 위까지 침범하는지.
+  3. r3f Scene3D에서 마우스 회전·줌으로 두 색상 클러스터의 깊이 분포가 자연스러운지.
+  4. 시퀀스 차트가 #0→#1, …, #0→#4 모두 carry+new 합 ≥ 10인지(게이트와 일관).
 
 ---
 
