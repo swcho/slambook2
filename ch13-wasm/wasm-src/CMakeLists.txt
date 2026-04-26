@@ -11,12 +11,13 @@ if(NOT DEFINED CH13_WASM_VARIANT)
 endif()
 
 # CH13_WASM_TARGET selects which target to build.
-#   hello      (Phase A)         — minimal hello_world binding
-#   pnp_spike  (Phase A+ Stage 1) — g2o + Eigen PnP spike
-#   ba_spike   (Phase A+ Stage 2) — g2o + Eigen BA spike
-#   camera     (Phase B Step 2)   — minimal pinhole Camera binding
-#   cv_spike   (Phase C gate)     — minimal OpenCV smoke test
-#   features   (Phase C / Step 3+4) — GFTT/Harris/FAST/ORB + LK binding
+#   hello         (Phase A)         — minimal hello_world binding
+#   pnp_spike     (Phase A+ Stage 1) — g2o + Eigen PnP spike
+#   ba_spike      (Phase A+ Stage 2) — g2o + Eigen BA spike
+#   camera        (Phase B Step 2)   — minimal pinhole Camera binding
+#   cv_spike      (Phase C gate)     — minimal OpenCV smoke test
+#   features      (Phase C / Step 3+4) — GFTT/Harris/FAST/ORB + LK binding
+#   triangulation (Phase D / Step 5)   — Linear SVD + Midpoint triangulation
 if(NOT DEFINED CH13_WASM_TARGET)
   set(CH13_WASM_TARGET "hello")
 endif()
@@ -96,29 +97,20 @@ if(CH13_WASM_TARGET STREQUAL "camera")
 endif()
 
 # -----------------------------------------------------------------------------
-# Targets: pnp_spike (Stage 1) and ba_spike (Stage 2) — Phase A+ gate.
-# Share the same g2o setup; only the binding cpp and link-library list differ.
+# Helper: vendor Eigen via the third_party submodule and expose Eigen3_DIR so
+# downstream find_package(Eigen3) calls succeed. Cached so calling it multiple
+# times in one configure (different targets) is a no-op.
 # -----------------------------------------------------------------------------
-if(CH13_WASM_TARGET STREQUAL "pnp_spike" OR CH13_WASM_TARGET STREQUAL "ba_spike")
-  # ch13-wasm-owned submodule (modern g2o master) — intentionally decoupled
-  # from the book's pinned 3rdparty/g2o (2018) to stay compatible with a
-  # modern Eigen + CMake.
-  set(G2O_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/third_party/g2o")
+function(_ch13_setup_eigen)
+  if(_CH13_EIGEN_READY)
+    return()
+  endif()
   set(EIGEN_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/third_party/eigen")
-
-  # Eigen: vendored as a submodule under third_party/eigen (pinned tag 5.0.1).
-  # Using add_subdirectory gives us a fully portable build that does not
-  # depend on the host having Homebrew / apt Eigen installed. Modern g2o
-  # calls find_package(Eigen3 REQUIRED NO_MODULE) at its top-level CMake,
-  # so we enable EIGEN_BUILD_CMAKE_PACKAGE=ON to make Eigen generate an
-  # Eigen3Config.cmake into its build dir and then point Eigen3_DIR at it.
   if(NOT EXISTS "${EIGEN_ROOT}/CMakeLists.txt")
     message(FATAL_ERROR
       "Eigen submodule not initialized at ${EIGEN_ROOT}. "
       "Run: git submodule update --init --recursive")
   endif()
-
-  # Quiet Eigen's top-level auxiliaries — we only want the header-only target.
   set(EIGEN_BUILD_CMAKE_PACKAGE ON  CACHE BOOL "" FORCE)
   set(EIGEN_BUILD_DOC           OFF CACHE BOOL "" FORCE)
   set(EIGEN_BUILD_DEMOS         OFF CACHE BOOL "" FORCE)
@@ -129,12 +121,23 @@ if(CH13_WASM_TARGET STREQUAL "pnp_spike" OR CH13_WASM_TARGET STREQUAL "ba_spike"
   set(EIGEN_BUILD_SPBENCH       OFF CACHE BOOL "" FORCE)
   set(EIGEN_BUILD_PKGCONFIG     OFF CACHE BOOL "" FORCE)
   set(BUILD_TESTING             OFF CACHE BOOL "" FORCE)
-  # Keep Eigen from polluting the user's ~/.cmake/packages registry.
   set(CMAKE_EXPORT_NO_PACKAGE_REGISTRY ON)
-
   add_subdirectory("${EIGEN_ROOT}" "${CMAKE_CURRENT_BINARY_DIR}/eigen_build" EXCLUDE_FROM_ALL)
   set(Eigen3_DIR "${CMAKE_CURRENT_BINARY_DIR}/eigen_build" CACHE PATH "" FORCE)
+  set(_CH13_EIGEN_READY TRUE CACHE INTERNAL "" FORCE)
   message(STATUS "[ch13-wasm] Eigen3_DIR=${Eigen3_DIR} (vendored submodule)")
+endfunction()
+
+# -----------------------------------------------------------------------------
+# Targets: pnp_spike (Stage 1) and ba_spike (Stage 2) — Phase A+ gate.
+# Share the same g2o setup; only the binding cpp and link-library list differ.
+# -----------------------------------------------------------------------------
+if(CH13_WASM_TARGET STREQUAL "pnp_spike" OR CH13_WASM_TARGET STREQUAL "ba_spike")
+  # ch13-wasm-owned submodule (modern g2o master) — intentionally decoupled
+  # from the book's pinned 3rdparty/g2o (2018) to stay compatible with a
+  # modern Eigen + CMake.
+  set(G2O_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/third_party/g2o")
+  _ch13_setup_eigen()
 
   # g2o: disable everything we don't need for the spike.
   set(G2O_USE_OPENGL OFF CACHE BOOL "" FORCE)
@@ -312,6 +315,41 @@ if(CH13_WASM_TARGET STREQUAL "features")
 
   set_target_properties(myslam_features PROPERTIES
     OUTPUT_NAME "myslam_features.${CH13_WASM_VARIANT}"
+    SUFFIX ".js"
+  )
+endif()
+
+# -----------------------------------------------------------------------------
+# Target: triangulation (Phase D / Step 5) — Eigen-only DLT + Midpoint.
+# Decoupled from the OpenCV-heavy features target so the bundle stays small
+# (Eigen is header-only and only the JacobiSVD<4×4> + 3×3 inverse get
+# instantiated → expected ≈30–80 KB wasm).
+# -----------------------------------------------------------------------------
+if(CH13_WASM_TARGET STREQUAL "triangulation")
+  _ch13_setup_eigen()
+
+  add_executable(myslam_triangulation
+    myslam/bindings/bind_triangulation.cpp
+  )
+  target_compile_options(myslam_triangulation PRIVATE -O3 ${VARIANT_FLAGS})
+  target_link_options(myslam_triangulation PRIVATE
+    -O3 --bind
+    -sMODULARIZE=1
+    -sEXPORT_ES6=1
+    -sEXPORT_NAME=createTriangulationModule
+    -sALLOW_MEMORY_GROWTH=1
+    -sENVIRONMENT=web,worker,node
+    -sWASM=1
+    ${VARIANT_LINK}
+  )
+  # Eigen3::Eigen is a header-only INTERFACE target; no link library needed
+  # but we use it for include propagation. The vendored submodule reports
+  # version 5.0.1; we accept anything that exposes the modern Eigen3 package.
+  find_package(Eigen3 REQUIRED NO_MODULE)
+  target_link_libraries(myslam_triangulation PRIVATE Eigen3::Eigen)
+
+  set_target_properties(myslam_triangulation PROPERTIES
+    OUTPUT_NAME "myslam_triangulation.${CH13_WASM_VARIANT}"
     SUFFIX ".js"
   )
 endif()

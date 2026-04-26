@@ -5,7 +5,7 @@
 
 - **시작일**: 2026-04-17
 - **최근 갱신**: 2026-04-26
-- **현재 진행 중**: **Phase D 착수 대기** — Phase C Step 3(Feature Detection) + Step 4(Stereo LK) 본 작업 완료(2026-04-26). 다음: Phase D Step 5(Triangulation) + Step 6(Initial Map). SIMD/MT variant·WebGL/WebGPU 가속 경로는 Phase C+로 deferred.
+- **현재 진행 중**: **Phase E 착수 대기** — Phase D Step 5(Triangulation) + Step 6(Initial Map) 본 작업 완료(2026-04-26). 다음: Phase E Step 7(Frame Tracking, LK prev→curr) + Step 8(PnP via g2o).
 
 ---
 
@@ -23,8 +23,10 @@
 | Phase C 게이트 spike (Q1~Q4) | ✅ 2026-04-26 — OpenCV 4.13.0 분리 빌드 + cv_spike 단일 myslam.wasm 통합 + GFTT 200/200 + LK 100% (mean dx = −14.00 px) |
 | Phase C Step 3 (Feature Detection) | ✅ 2026-04-26 — `myslam_features.baseline.wasm` 1.14 MB. GFTT/Harris/FAST/ORB 4개 algo + 마스크 + Step3 UI (AlgoPicker, 슬라이더, 오버레이). 4개 algo 모두 200/200 kps, mask 100×100 hole 0/0 |
 | Phase C Step 4 (Stereo LK) | ✅ 2026-04-26 — `bind_features.trackLK` (winSize/maxLevel/maxIter/eps/useInitialFlow). Step4 UI (좌→우 매칭선, 200/200 트랙, mean dx=-21.95 px, mean &#124;dy&#124;=0.00 px on synthetic stereo) |
+| Phase D Step 5 (Triangulation) | ✅ 2026-04-26 — `myslam_triangulation.baseline.wasm` 28 KB (Eigen-only). Linear SVD + Midpoint, σ4/σ3 quality + invertedReturn 토글. Step5 UI(top-down X-Z + depth histogram). 60-pt 합성 GT round-trip maxErr 3.96e-14 m |
+| Phase D Step 6 (Initial Map) | ✅ 2026-04-26 — Step6 UI(KeyFrame 카드 + r3f Scene3D: 좌/우 frustum + 초기 MapPoint 클라우드). num_features_init 게이트, depth 1–80 m 검증. Three.js + @react-three/{fiber@8, drei@9} 도입(React 18 호환), Step 6 lazy chunk로 분리 |
 | 현재 브랜치 | `ex` |
-| 마지막 커밋 | `c3d1659` (Phase C 게이트 spike) → 본 작업 커밋 예정 |
+| 마지막 커밋 | `ea7b734` (Phase C Step 3+4) → 본 작업 커밋 예정 |
 
 ---
 
@@ -40,7 +42,9 @@
   - [x] Step 3 본 작업 — `bind_features.cpp`, AlgoPicker(GFTT/Harris/FAST/ORB), Step3 UI
   - [x] Step 4 본 작업 — LK 좌→우 매칭, Step4 UI
   - Phase C+로 deferred: SIMD/MT variant 빌드, WebGL Harris / WebGPU GFTT, OpenCV contrib(SIFT/AKAZE)
-- [ ] **Phase D** — Step 5~6 Triangulation + Initial Map
+- [x] **Phase D** — Step 5~6 Triangulation + Initial Map ← 2026-04-26 완료
+  - [x] Step 5 본 작업 — `bind_triangulation.cpp` (Eigen-only, JacobiSVD<4×4> + Midpoint), Step5 UI(top-down + depth histogram), invertedReturn 토글
+  - [x] Step 6 본 작업 — Step6 UI(KeyFrame 카드 + r3f/drei Scene3D), num_features_init 게이트, lazy chunk 분리
 - [ ] **Phase E** — Step 7~8 Frame Tracking + PnP
 - [ ] **Phase F** — Step 9~10 Keyframe + New MapPoints
 - [ ] **Phase G** — Step 11 Bundle Adjustment (난이도 최상)
@@ -57,8 +61,8 @@
 | 2. Camera Model | ✅ | ✅ | WASM `myslam_camera.baseline` 18 KB. 게이트: 60-point 그리드 round-trip maxErr < 1e-5 (실측 1.06e-15). P0/P1 extrinsic 선택 가능 |
 | 3. Feature Detection | ✅ | ✅ | `myslam_features.baseline` 1.14 MB. GFTT/Harris/FAST/ORB + 마스크. 게이트: WASM 로드, 좌측 이미지 로드, 검출수 ≥ max·0.5, 4×4 그리드 ≥ 8 셀 분포 |
 | 4. Stereo Matching (LK) | ✅ | ✅ | LK pyramid (winSize/maxLevel/maxIter/eps/useInitialFlow). 게이트: 매칭율 ≥ 60%, mean &#124;dy&#124; ≤ 2 px, mean dx < 0 |
-| 5. Triangulation | ⬜ | ⬜ | |
-| 6. Initial Map | ⬜ | ⬜ | |
+| 5. Triangulation | ✅ | ✅ | `myslam_triangulation.baseline` 28 KB (Eigen-only). Linear SVD + Midpoint + invertedReturn 토글. 게이트: WASM 로드, 좌/우+calib 로드, accepted ≥ 30, mean depth > 0 ∧ ≤ 100 m |
+| 6. Initial Map | ✅ | ✅ | Step6 UI: KF0 frustum + 초기 MapPoint 3D 뷰(r3f/drei). 게이트: WASM 로드, 좌/우+calib 로드, landmarks ≥ num_features_init(50), all depth > 0, depth 1–80 m |
 | 7. Frame Tracking | ⬜ | ⬜ | |
 | 8. Pose Estimation (PnP) | ⬜ | ⬜ | |
 | 9. Keyframe Decision | ⬜ | ⬜ | |
@@ -98,6 +102,10 @@
 | 2026-04-26 | **CMake 헬퍼 함수 `_ch13_import_opencv()` 도입** | cv_spike + features 두 타깃이 동일한 `find_package(OpenCV …)` 절차를 반복 — DRY 위반 + 향후 OpenCV consumer 추가 시 cargo-cult 위험 | `wasm-src/CMakeLists.txt` 안에서만 사용. 다른 옵션(빌드 트리 변경, contrib 추가)도 단일 진입점에서 관리 |
 | _(미정)_ | OpenCV submodule 채택 시 contrib(SIFT/AKAZE)까지 포함할지 여부 | features2d만으로 GFTT/Harris/FAST/ORB 충족 — contrib는 Step 11 BA·Loop closure 시점에 재평가 | 번들 크기 |
 | _(미정)_ | Phase C+ — SIMD/MT variant 빌드 도입 시점 | 현재 baseline만 빌드. PLAN §4 매트릭스의 Step 3/4 행 활성화는 Phase G(BA) spike 결과로 성능 병목 위치를 확인한 뒤 일괄 도입이 효율적 | OpenCV 분리 빌드를 variant마다 1회씩 추가로 돌려야 함 (~5분 × 4) |
+| 2026-04-26 | **Phase D 삼각화 모듈은 OpenCV 무관 — Eigen-only 별도 WASM**(`myslam_triangulation.baseline.{js,wasm}` = 30 KB + 28 KB) | (1) ch13 algorithm.h::triangulation은 `bdcSvd<MatXX>(Eigen::ComputeThinU\|ComputeThinV)`만 쓰는 30줄 함수 — OpenCV 의존 없음. (2) Eigen은 이미 vendored(`third_party/eigen` 5.0.1). 새 타깃은 `find_package(Eigen3 REQUIRED NO_MODULE)` + `target_link_libraries(... Eigen3::Eigen)`만으로 충분. (3) features WASM(1.14 MB)에 합치는 대신 별도 모듈로 분리 → Step 5/6은 features 모듈 없이도 단독 로드 가능 + 번들 크기 가시화. (4) `_ch13_setup_eigen()` CMake 헬퍼 함수 도입(`_ch13_import_opencv()`와 같은 패턴) | Phase G(BA)에서도 동일 헬퍼 재사용. 향후 Step 7 PnP/Step 8/Step 11 BA에서 Eigen 추가 의존 타깃을 만들 때마다 호출 |
+| 2026-04-26 | **Triangulation 바인딩 API: K(4) + T(12) 분리** — `triangulate(leftPts, rightPts, kL[4], tL[12], kR[4], tR[12], opts) → stride 5 [x,y,z,metric,ok]` | (1) 통합 P 행렬(3×4)을 받는 안은 학습자가 P = K[R\|t] 분해를 항상 머릿속으로 해야 함. K와 T를 분리하면 ch13의 `Camera::pixel2camera`(K^-1 적용) → `algorithm.h::triangulation`(SE3 + normalized point) 데이터 흐름이 그대로 보임. (2) K는 [fx,fy,cx,cy]만으로 충분(skew=0 가정 — KITTI rectified의 표준). (3) T는 12-float 3×4 row-major [R\|t] — Phase E(Step 7/8)에서 SE(3) pose가 들어와도 그대로 확장 가능 | TS 헬퍼 `makeK(fx,fy,cx,cy)` + `makeRectifiedT([tx,ty,tz])` 제공. KITTI 정류 stereo는 R=I 가정이므로 `tL = [I\|0]`, `tR = [I\|(-baseline,0,0)]` |
+| 2026-04-26 | **invertedReturn 토글의 의미** — 책 algorithm.h의 "포기 주석 vs 코드 polarity" 충돌을 학습자가 직접 토글로 관찰 | algorithm.h은 `σ4/σ3 < 1e-2`일 때 return true(주석은 "포기"라 적혀 있지만 caller가 `if (return)`으로 그 결과를 채택함). 본 binding의 default는 "fixed" 의미(quality good ↔ ok=1). 토글 시 caller의 polarity가 그대로 inverted된 효과 — fixed=N개 vs inverted=(total−N)개로 시각적으로 즉시 다름 | Step 5 UI에 체크박스로 노출. PLAN §3 Step 5 "학습용 반환 반전 버그 토글" 요구사항 충족 |
+| 2026-04-26 | **3D 시각화 라이브러리: react-three-fiber v8 + drei v9 + three** 채택 | (1) PLAN §1.1은 Three.js를 명시. (2) 사용자 명시 요청(2026-04-26): "r3f, drei를 사용해 줘" → 선언적 React-방식이 r3f의 컨벤션. (3) v8 LTS는 React 18 peer 충족(v9는 React 19 강제). (4) Step 6 컴포넌트는 lazy chunk로 분리 → 초기 번들 gzip **94.86 KB** 유지(PLAN §10 ≤ 400 KB), Step 6 chunk만 249 KB gzip(전용 페이지 진입 시에만 로드) | Phase H(Step 13 Full Pipeline)의 trajectory + 실시간 포인트 클라우드도 같은 Scene3D 컴포넌트 재사용 예정. drei `<Grid/><OrbitControls/><Line/>` 활용 — 렌더 루프/카메라 컨트롤 직접 작성 없음 |
 
 ---
 
@@ -126,19 +134,25 @@
   - WASM hello 소스: `ch13-wasm/wasm-src/myslam/bindings/bind_hello.cpp`
   - WASM Camera 바인딩: `ch13-wasm/wasm-src/myslam/bindings/bind_camera.cpp`
   - WASM Features 바인딩 (Step 3+4): `ch13-wasm/wasm-src/myslam/bindings/bind_features.cpp`
+  - WASM Triangulation 바인딩 (Step 5+6): `ch13-wasm/wasm-src/myslam/bindings/bind_triangulation.cpp`
   - Phase A+ 스파이크: `ch13-wasm/wasm-src/spike/{bind_pnp_spike.cpp, bind_ba_spike.cpp, verify_pnp.mjs, verify_ba.mjs, verify_pnp_diag*.mjs}`
   - Phase C 게이트 스파이크: `ch13-wasm/wasm-src/spike/{bind_cv_spike.cpp, verify_cv.ts}` — `npm run verify:cv_spike`
   - Phase C 본 작업 검증: `ch13-wasm/wasm-src/spike/verify_features.ts` — `npm run verify:features`
-  - 빌드 스크립트: `ch13-wasm/wasm-src/{CMakeLists.txt, build.sh}` — `bash build.sh [baseline|simd|mt|mt-simd] [hello|camera|pnp_spike|ba_spike|cv_spike|features]`
+  - Phase D 본 작업 검증: `ch13-wasm/wasm-src/spike/verify_triangulation.ts` — `npm run verify:triangulation`
+  - 빌드 스크립트: `ch13-wasm/wasm-src/{CMakeLists.txt, build.sh}` — `bash build.sh [baseline|simd|mt|mt-simd] [hello|camera|pnp_spike|ba_spike|cv_spike|features|triangulation]`
   - OpenCV 분리 빌드 스크립트: `ch13-wasm/wasm-src/scripts/build-opencv.sh` — `npm run build:opencv:baseline`
   - g2o submodule (modern master): `ch13-wasm/wasm-src/third_party/g2o/`
   - Eigen submodule (tag 5.0.1): `ch13-wasm/wasm-src/third_party/eigen/`
   - OpenCV submodule (tag 4.13.0, shallow): `ch13-wasm/wasm-src/third_party/opencv/`
   - OpenCV 빌드 산출물: `ch13-wasm/wasm-src/build/opencv-{build,install}-<variant>/` (gitignored). install/lib에 `libopencv_{core,imgproc,features2d,video}.a`
-  - 빌드 산출물: `ch13-wasm/public/wasm/myslam_{hello,camera,pnp_spike,ba_spike,cv_spike,features}.<variant>.{js,wasm}`
+  - 빌드 산출물: `ch13-wasm/public/wasm/myslam_{hello,camera,pnp_spike,ba_spike,cv_spike,features,triangulation}.<variant>.{js,wasm}`
   - Step 3 UI: `ch13-wasm/src/steps/Step03_FeatureDetection/`
   - Step 4 UI: `ch13-wasm/src/steps/Step04_StereoMatching/`
+  - Step 5 UI: `ch13-wasm/src/steps/Step05_Triangulation/`
+  - Step 6 UI: `ch13-wasm/src/steps/Step06_InitialMap/` (lazy chunk; r3f Scene3D)
+  - 공통 Scene3D 컴포넌트: `ch13-wasm/src/components/Scene3D.tsx` (r3f + drei)
   - TS 로더: `ch13-wasm/src/wasm/features.ts` (`loadFeaturesWasm` + `imageDataToGray`)
+  - TS 로더: `ch13-wasm/src/wasm/triangulation.ts` (`loadTriangulationWasm` + `makeK` + `makeRectifiedT`)
 - (예정) 단계별 학습 노트: `docs/steps/NN-*.md`
 
 ---
@@ -407,6 +421,69 @@ PLAN §9 Phase C 1.5주 추정과 일치. 단, OpenCV.js 빌드 대신 **분리 
 
 - `http://localhost:5173/step/feature-detection`: 알고리즘 토글 시 keypoint 오버레이가 4개 패턴(GFTT는 코너 집중, FAST는 임계값에 따른 샤프함, ORB는 스케일 분포)으로 변하는지 확인.
 - `http://localhost:5173/step/stereo-matching`: 매칭 라인이 거의 수평하고 (epipolar) 좌→우 방향으로 수십 px 이동하는지 확인. `useInitialFlow` 토글 후 평균 dx가 더 stable해지는지 비교.
+
+---
+
+## Phase D — Step 5/6 본 작업 완료 (2026-04-26)
+
+### 결과 요약
+
+| 항목 | 값 |
+|------|-----|
+| `bind_triangulation.cpp` | 168 LOC. Embind: `triangulate(leftPts, rightPts, kL[4], tL[12], kR[4], tR[12], opts) → Float64Array stride 5 [x,y,z,metric,ok]` + `ALGO_LINEAR_SVD`/`ALGO_MIDPOINT` 상수 |
+| 지원 알고리즘 | Linear SVD(`Eigen::JacobiSVD<Matrix4>` — DLT, σ4/σ3 quality), Midpoint(closest-point on skew rays — relative ray-distance/depth metric) |
+| 옵션 | `algo`(0/1), `qualityThreshold`(default 0.01), `invertedReturn`(book "포기" 토글) |
+| WASM 크기 | `myslam_triangulation.baseline.{js, wasm}` = 30 KB + **28 KB** (Eigen-only 헤더 인스턴스화만 포함, OpenCV 무관) |
+| 빌드 시간 | ~5초 (Eigen submodule 헤더 인스턴스화 → 단일 .cpp 컴파일) |
+
+### `verify_triangulation.ts` 검증 결과 (`npm run verify:triangulation`)
+
+| 케이스 | 결과 |
+|--------|------|
+| Linear SVD 60-pt grid (depth 5..17 m, 정확 stereo 투영) | maxErr **3.96e-14 m**, maxRatio **9.37e-17**, accepted **60/60** in 1.70 ms |
+| Midpoint 60-pt grid (정확 stereo 투영) | maxErr **5.57e-12 m**, accepted **60/60** in 0.72 ms |
+| Linear SVD with 4 px epipolar 노이즈, threshold 0.01 | accepted **0/60**, medianRatio **2.09e-2** (well above threshold — 정상) |
+| invertedReturn 토글 (depth>0 보장) | fixed=0/60, inverted=60/60, mismatches=0 — 모든 행 polarity flip 확인 |
+| status ≤ 0.5 입력 | (0,0,0,NaN,0) 행으로 정상 처리, 인접 정상 입력은 영향 없음 |
+
+### Step 5 — Triangulation (UI)
+
+- AlgoPicker: Linear SVD / Midpoint 토글. 알고리즘별 quality threshold 의미를 슬라이더 라벨에 동적 표시.
+- frame slider (0..4), `maxFeatures` slider (20..500), `qualityThreshold` slider (1e-4..0.5).
+- `invertedReturn` 체크박스 — 책 algorithm.h의 "포기" 주석과 코드 polarity 충돌을 직접 관찰.
+- 입력 뷰: KITTI mini 스테레오 쌍 vertical stack + baseline 표시.
+- 출력 뷰: top-down (X, Z) 산점도(녹색=accepted, 빨강=rejected) + depth histogram (32 bin, 0–60 m).
+- 요약: tracked / total, accepted, mean z, median metric, detect/LK/triangulate ms 분리 표시.
+- VerifyGate: features+triangulation WASM 로드, 좌/우+calib 로드, accepted ≥ 30, mean depth > 0 ∧ ≤ 100 m.
+
+### Step 6 — Initial Map (UI)
+
+- num_features_init slider (10..200, ch13 default 50)로 게이트 임계값 직접 조정.
+- KeyFrame 카드 — landmark 수 / depth min/mean/max / baseline. 임계값 충족 시 ✅ KF0 toast.
+- r3f Scene3D — 좌측 카메라 frustum(녹색, KF0) + 우측 카메라 frustum(파랑, baseline 시프트) + 초기 MapPoint 클라우드(연두). drei `<OrbitControls>` + `<Grid>` + `<Line segments>`로 마우스 회전·줌·팬 지원.
+- VerifyGate: features+triangulation WASM 로드, 좌/우+calib 로드, landmarks ≥ num_features_init, all depth > 0, depth 1–80 m.
+
+### 빌드/번들 검증
+
+| 항목 | 관측값 |
+|------|--------|
+| `npm run verify:triangulation` | ✅ 모든 5케이스 통과 |
+| `npx tsc -b` | ✅ 0 errors |
+| `npm run build` | ✅ 초기 chunk **94.86 KB gzipped** (PLAN §10 ≤ 400 KB), Step 6 lazy chunk **249.03 KB gzipped** (Three.js + r3f + drei 격리) |
+| `GET /step/triangulation`, `/step/initial-map` | 200 text/html, COEP/COOP 헤더 반영 |
+| `GET /wasm/myslam_triangulation.baseline.{js,wasm}` | 200 text/javascript / application/wasm, COEP/COOP 반영 |
+
+### 의식적으로 deferred
+
+- 실제 KeyFrame / MapPoint 데이터 모델 영속화 — Phase F(Step 9~10) Map 매니저 도입 시 통합. 현재 Step 6은 view-only이며 다음 Step에서 재사용되는 상태가 없음.
+- σ3, σ4 + reprojection error 차트 — Step 5 UI는 아직 단일 frame 뷰만 제공. PerfMeter 본 구현 시점에 추가.
+- `docs/steps/{05,06}-*.md` 학습 노트 — Phase I 마감 단계.
+- Step 6에서 Triangulation 알고리즘 토글 노출 — 본 게이트 검증은 ch13 default(LinearSVD)로 통과. 알고리즘 비교는 Step 5 UI 책임.
+
+### 남은 사용자 육안 관측
+
+- `http://localhost:5173/step/triangulation`: invertedReturn 체크박스를 토글했을 때 "accepted" 카운트가 0과 (총수)로 극단적으로 점프하는지, top-down 뷰의 녹/빨강 비율이 뒤집히는지 확인.
+- `http://localhost:5173/step/initial-map`: r3f 캔버스에 두 frustum이 baseline만큼 떨어져 있고, 마우스 드래그/휠로 회전·줌이 부드럽게 동작하는지, num_features_init 슬라이더를 ≤ landmark count로 내리면 ✅ KF0가 점등되는지 확인.
 
 ---
 

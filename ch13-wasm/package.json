@@ -17,13 +17,19 @@
     "verify:cv_spike": "node --experimental-strip-types wasm-src/spike/verify_cv.ts",
     "build:wasm:features": "bash wasm-src/build.sh baseline features",
     "verify:features": "node --experimental-strip-types wasm-src/spike/verify_features.ts",
+    "build:wasm:triangulation": "bash wasm-src/build.sh baseline triangulation",
+    "verify:triangulation": "node --experimental-strip-types wasm-src/spike/verify_triangulation.ts",
     "gen:dataset": "node --experimental-strip-types scripts/gen-kitti-mini.ts"
   },
   "dependencies": {
+    "@react-three/drei": "^9.122.0",
+    "@react-three/fiber": "^8.18.0",
     "@tanstack/react-query": "^5.100.1",
+    "@types/three": "^0.184.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.28.0",
+    "three": "^0.184.0",
     "zustand": "^5.0.2"
   },
   "devDependencies": {
