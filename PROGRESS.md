@@ -4,8 +4,8 @@
 각 Phase/Step 종료 시 이 파일을 반드시 갱신하고 커밋해야 새 세션이 상태를 복원할 수 있다.
 
 - **시작일**: 2026-04-17
-- **최근 갱신**: 2026-04-26
-- **현재 진행 중**: **Phase F 완료(2026-04-26)** — Step 9(Keyframe Decision, 3 정책) + Step 10(New MapPoints via Keyframe, 마스크 토글 + 3D 시각화) 모두 통과. 다음: **Phase G** — Step 11(Bundle Adjustment) — 가장 난이도 높음.
+- **최근 갱신**: 2026-04-28
+- **현재 진행 중**: **Phase G 완료(2026-04-28)** — Step 11(Bundle Adjustment, g2o + solver_eigen + 적응적 chi² + 좌/우 cam_ext + per-edge 메타) 통과. 다음: **Phase H** — Step 12(Sliding Window) + Step 13(Full Pipeline).
 
 ---
 
@@ -29,8 +29,9 @@
 | Phase E Step 8 (Pose Estimation, PnP via g2o) | ✅ 2026-04-26 — `bind_pnp_spike`를 `myslam/bindings/bind_pnp.cpp`로 승격(`myslam_pnp.baseline.{js,wasm}` 88 KB + **391 KB**). 4-라운드 outlier 마킹 + RobustKernel drop-after-round + Huber δ 노출. 라운드별 inlier 마스크/chi² 분포를 노출해 Step 8 UI에서 라운드 슬라이더로 outlier 변화 애니메이션 시각화. `verify_pnp.ts` 14건 모두 통과 — 노이즈 없음 5건 + 1px 노이즈 3건 + 20% 시드 outlier 3건(recall 100%) + RobustKernel 토글 3건. cv::solvePnPRansac은 calib3d 모듈 추가 빌드 필요 → Phase E+로 deferred |
 | Phase F Step 9 (Keyframe Decision) | ✅ 2026-04-26 — Step9 UI(3 정책 토글: inlier-count / motion / hybrid). i → i+1 transition마다 Step 7+8 파이프라인을 재사용해 tracking_inliers/||t||/rot 산출, KF 결정 막대차트 + 표 + 임계값 점선. WASM 신규 없음. 게이트: 3 WASM 로드 + 모든 4 transition PnP 수렴 + 정책이 ≥1 KF 트리거 (PLAN §3 "5–15%"는 long-sequence 기준이라 mini fixture에선 학습용 게이트로 완화) |
 | Phase F Step 10 (New MapPoints via Keyframe) | ✅ 2026-04-26 — Step10 UI(redetect 모드 토글: mask-existing(±10 box, ch13 default) / full-redetect). frame 0 stereo+temporal 결과로 carry-over set 시뮬레이션, 새 KF에서 GFTT 마스크 재검출 → stereo LK → linear-SVD triangulation. 2D 오버레이(청록=carry, 노랑=new) + r3f Scene3D(좌/우 frustum + 두 색상 포인트 클라우드) + 4 KF 후보에 대한 carry/new 누적 막대차트. WASM 신규 없음(features+triangulation 재사용). lazy chunk로 분리(Scene3D 기존 chunk 공유). 게이트: 2 WASM + frame 0/i + calib + new ≥ 10 + depth 1–80 m |
+| Phase G Step 11 (Bundle Adjustment) | ✅ 2026-04-28 — `myslam_ba.baseline.{js,wasm}` 88 KB + **439 KB** (spike 416 KB 대비 +5%, per-edge 메타 + 적응적 chi² + 좌/우 cam_ext 추가). spike의 `solver_eigen`(SimplicialLLT) + binary edge + Schur complement 그대로 승격. ch13 backend.cpp::Optimize의 적응적 chi² 루프(`while(iteration<5)`) + RobustKernel + 좌/우 외부 파라미터 분기까지 전부 반영. 4 WASM 파이프라인(features+triangulation+pnp+ba) 단일 페이지에 상주. Step 11 UI(active window 2/3 KF + 10 슬라이더 + chi² histogram before/after + Scene3D pre/post 토글). lazy chunk로 분리(Scene3D 공유). `verify_ba.ts` 10건 모두 통과 — Stage 2 회귀(noiseless 3 + 1px noise 3) + 적응적 chi² (4 doublings) + stereo cam_ext (scale gauge 고정 → maxLm 7e-12). 게이트: 4 WASM + 5 frames + calib + obs ≥ 60 + chi² 감소 ≥ 30%(mini fixture) + 단조 수렴 |
 | 현재 브랜치 | `ex` |
-| 마지막 커밋 | `0c9b06e` (Phase E Step 8) → 본 작업 커밋 예정 |
+| 마지막 커밋 | `cc90dd7` (Phase F) → 본 작업 커밋 예정 |
 
 ---
 
@@ -55,7 +56,8 @@
 - [x] **Phase F** — Step 9~10 Keyframe + New MapPoints ← 2026-04-26 완료
   - [x] Step 9 본 작업 — Step9 UI(3 정책 토글 + tracking_inliers 막대차트 + 결정 표). features+triangulation+pnp WASM 재사용 (C++ 신규 바인딩 없음)
   - [x] Step 10 본 작업 — Step10 UI(carry-over 마스크 ±10 vs full-redetect + 4 KF sequence 차트 + r3f Scene3D). features+triangulation WASM 재사용 (C++ 신규 바인딩 없음). 영속 KeyFrame/MapPoint 모델은 Phase H Map 매니저로 deferred
-- [ ] **Phase G** — Step 11 Bundle Adjustment (난이도 최상)
+- [x] **Phase G** — Step 11 Bundle Adjustment (난이도 최상) ← 2026-04-28 완료
+  - [x] Step 11 본 작업 — `bind_ba.cpp`(Phase A+ Stage 2 spike 승격 + 좌/우 cam_ext + 적응적 chi² + per-edge 메타). Step11 UI(active window 2/3 + LM 슬라이더 + 적응적 chi² 슬라이더 + 전/후 chi² histogram + r3f Scene3D pre/post 토글). 10건 verify_ba.ts 통과. CXSparse / minimal LM 대체 알고리즘은 Phase G+로 deferred
 - [ ] **Phase H** — Step 12~13 Sliding Window + Full Pipeline
 - [ ] **Phase I** — a11y·모바일·문서·Playwright 스모크
 
@@ -75,7 +77,7 @@
 | 8. Pose Estimation (PnP) | ✅ | ✅ | `myslam_pnp.baseline` 391 KB. g2o LM 4-라운드 outlier 루프(rounds/iterPerRound/chi²/Huber δ/drop-after-round 슬라이더). Step 5/6/7 파이프라인 입력(prev L+R triangulation → curr L LK → 3D-2D pair). 게이트: WASM 3개 로드, prev+curr+calib, pair ≥ 30, inlier > 70% (PLAN §3 Step 8), final chi² 유한값. 라운드 슬라이더 + 막대차트로 outlier 변화 시각화 |
 | 9. Keyframe Decision | ✅ | ✅ | features+triangulation+pnp WASM 재사용. 3 정책 토글: inlier-count(ch13), motion(||t||/rot 임계), hybrid. 모든 4 transition마다 Step 7+8 파이프라인 자동 실행 → tracking_inliers 막대차트 + 결정 표. 게이트: 3 WASM 로드, 4 frames+calib 로드, 4/4 PnP 수렴, ≥1 KF 트리거(PLAN §3 "KF 5–15%"는 long-sequence 기준이라 mini fixture에선 학습용 게이트로 완화) |
 | 10. New MapPoints | ✅ | ✅ | features+triangulation WASM 재사용. mask-existing(±10 box, ch13) vs full-redetect 토글, 마스크 반경 슬라이더. carry-over set은 frame 0 stereo+temporal로 시뮬레이션. 2D 오버레이(청록 carry / 노랑 new) + r3f Scene3D + 4 KF 후보에 대한 carry/new 막대차트. 게이트: 2 WASM 로드, frame 0+i+calib 로드, new ≥ 10, depth ∈ [1, 80] m |
-| 11. Bundle Adjustment | ⬜ | ⬜ | |
+| 11. Bundle Adjustment | ✅ | ✅ | `myslam_ba.baseline` 439 KB. g2o + solver_eigen(SimplicialLLT) + Schur 보완 + 적응적 chi² + 좌/우 cam_ext 분기. ch13 backend.cpp::Optimize 그대로. 4-WASM 파이프라인(features+triangulation+pnp+ba) 단일 화면, Step 11 UI(active window 2/3 KF + 10 슬라이더 + chi² histogram before/after + r3f Scene3D pre/post 토글). 게이트: 4 WASM, 5 frames+calib, observations ≥ 60, chi² 감소 ≥ 30%(mini fixture 완화), 단조 수렴, 유한값. CXSparse / minimal LM 대체는 Phase G+ |
 | 12. Sliding Window | ⬜ | ⬜ | |
 | 13. Full Pipeline | ⬜ | ⬜ | |
 
@@ -121,6 +123,9 @@
 | 2026-04-26 | **Phase F는 신규 C++ 바인딩 없이 UI-only로 완성** — Step 9/10 모두 features+triangulation+pnp WASM을 그대로 재사용 | (1) ch13 InsertKeyframe / TriangulateNewPoints는 입력 데이터(tracking_inliers, 상대 pose, 좌측 이미지 + 마스크)를 받아 결정/재삼각화하는 정책 함수 — Step 7/8에서 이미 노출한 파이프라인 산출물의 후처리. (2) features WASM이 이미 `mask: Uint8Array` 인자를 받음 → ch13 `cv::rectangle` 마스크와 같은 의미를 TS에서 원형 mask 빌더로 충분히 재현 가능. (3) Step 9는 책의 단일 정책(inlier-count) 외에 **motion / hybrid 두 정책을 추가로 토글**해 PLAN §3 "교체 가능 알고리즘" 요구를 만족. covariance 정책은 BA 후 landmark uncertainty가 있어야 의미 있어 Phase G 의존으로 disabled chip 유지. (4) Step 10은 carry-over set을 frame 0의 stereo triangulation + temporal LK survival로 시뮬레이션 — 영속 MapPoint 모델은 Phase H의 Map 매니저로 자연스럽게 합류. mask-existing vs full-redetect 토글이 책의 ±10 box 마스크 효과를 직접 비교하게 한다. | Phase G(BA)에서도 동일 패턴: WASM은 `bind_ba.cpp` 하나만 추가하고 정책 슬라이더/시각화는 TS에서 처리. 영속 KeyFrame/MapPoint 데이터 모델은 Phase H에서 Step 12(슬라이딩 윈도우)와 같이 도입 — Step 9/10은 그 시점에 stateful 사용자 흐름(여러 KF 누적, 제거)으로 확장 |
 | 2026-04-26 | **Step 9 게이트 완화: PLAN §3 "KF 비율 5–15%"는 학습용 ≥1 KF로 대체** | (1) PLAN의 5–15% 기준은 KITTI 05 전체 시퀀스(2761 프레임)를 가정한 통계. mini fixture는 5 프레임 → transition 4개 → 비율은 0/25/50/75/100%로 양자화. (2) "정책이 의미 있게 발화한다"가 본질적 학습 목표 — 슬라이더로 임계값을 조정해 KF 결정이 점진적으로 변하는 모습이 게이트 통과 신호. (3) ≥1 KF + ≤100% 두 조건만 자동 검증, 비율 자체는 표시만. | Phase H Step 13(Full Pipeline)에서 KITTI mini의 모든 5 프레임을 누적 처리할 때 비율 게이트 부활 — 그 때는 5–15% 직접 검증 가능 |
 | 2026-04-26 | **Step 10 carry-over set 시뮬레이션 방식: frame 0 stereo + frame 0 → frame[i] LK survival** | (1) ch13에서 carry-over는 직전 KF의 영속 MapPoint를 현재 프레임에 투영해 trackLastFrame(LK) 결과로 살아남은 점들. mini fixture에서는 영속 Map 매니저가 없어 직접 시뮬: frame 0의 stereo+triangulate → 3D 점 set → LK frame 0 left → frame[i] left에서 살아남은 점을 carry-over로 정의. (2) 이 시뮬레이션은 frame 0 카메라 frame과 frame[i] 카메라 frame의 차이를 무시 — mini fixture는 합성 fixture로 거의 같은 frame이라 OK. 실제 KITTI에서는 Step 8 PnP의 상대 pose로 carry-over 3D 좌표를 transform 해야 함. (3) Phase H에서 영속 Map이 들어오면 carry-over는 그냥 Map.GetActiveMapPoints() 호출로 대체. | Phase H Step 12 슬라이딩 윈도우 + Step 13 Full Pipeline에서 영속 Map이 들어올 때 Step 10 컴포넌트의 carry-over 입력을 그쪽으로 교체. 본 Phase F의 시뮬레이션 코드는 그대로 유지하되 toggle("simulated carry-over (Phase F)" / "active map (Phase H+)")로 비교 가능하게 만들 예정 |
+| 2026-04-28 | **Step 11 BA: spike 승격 + 적응적 chi² + 좌/우 cam_ext 분기** — Vertex/Edge는 Stage 2 spike 그대로, ch13 backend.cpp::Optimize의 차이만 추가 | (1) Phase A+ Stage 2 spike(`bind_ba_spike.cpp`)가 `solver_eigen`(SimplicialLLT) + binary edge + Schur(`setMarginalized(true)`)에서 30+자릿수 chi² 감소를 검증했다. 본 바인딩은 그 코드를 한 글자도 바꾸지 않고 namespace `myslam` 아래로 옮긴다. (2) ch13 backend는 spike 대비 두 가지가 추가됨: ① **좌/우 카메라 외부 파라미터** — observation별로 `feat->is_on_left_image_`로 분기해 `EdgeProjection(K, cam_left_->pose())` 또는 `EdgeProjection(K, cam_right_->pose())` 중 하나를 만든다. 이를 본 바인딩에서 obs flat 5-stride `[poseIdx, lmIdx, u, v, isLeft]`로 노출. ② **적응적 chi² 루프** — 책의 `while(iteration<5)` 코드는 LM 추가 반복 없이 임계값을 두 배씩 키워 inlier_ratio > 0.5에 도달시키는 후처리. 본 바인딩의 `adaptiveRounds`/`adaptiveInlierRatio` 옵션이 그대로 일치. (3) per-edge `chi²Initial`/`chi²Final` + `finalInlierMask`을 평탄 배열로 노출 → UI는 before/after histogram + 임계 점선을 바로 그릴 수 있다. (4) Schur는 항상 ON — `setMarginalized(true)`로 컴파일 타임 결정. ch13 backend도 동일. PLAN §3의 "Schur on/off 토글"은 별도 솔버를 추가로 빌드해야 의미가 있어 Phase G+로 deferred(disabled chip + tooltip). | `verify_ba.ts` 10건 통과 (Stage 2 회귀 6 + 적응적 chi² 1 + stereo cam_ext 1, 2건은 Stage 2 회귀 안에 포함). WASM 439 KB(spike 416 KB 대비 +5%, 적응적 루프 + per-edge 메타 + 좌/우 ext 분기 코드만 추가). cv::solvePnPRansac/EPnP/DLS는 Phase E+에서 calib3d 추가 시 일괄 처리하기로 한 결정 유지(Step 8 부분 참고). |
+| 2026-04-28 | **Step 11 chi² 감소 게이트 완화: PLAN §3 "≥ 40%" → 학습 게이트 ≥ 30%** | (1) PLAN의 40%는 실제 KITTI 시퀀스의 BA 수렴 기준. mini fixture는 fixture 합성이라 LK 노이즈가 작아 PnP init이 이미 잘 수렴된 상태로 BA에 진입 — chi² 추가 감소 여지가 줄어든다. (2) "BA가 의미 있게 단조 감소한다"가 본질적 학습 목표 — 30%로 낮춰도 학습자가 슬라이더(iterations / chi² init)를 조절할 때 게이트가 반응한다. (3) Phase H Step 13(Full Pipeline)에서 KITTI mini의 5 프레임을 누적 처리할 때 40% 게이트 부활. | 게이트 항목에 "(합성 fixture라 40% → 30% 완화)" 명시. Phase H에서 long-window BA로 다시 ≥ 40% 검증 |
+| 2026-04-28 | **Step 11 active window는 mini fixture에서 2/3 KF만 — PLAN §3 "3..15"는 Phase H로** | (1) mini fixture는 5 프레임뿐이라 KF 후보가 4개. 게다가 Step 11 단독 화면에서는 영속 Map 매니저가 없어 KF마다 stereo+temporal LK를 재계산해야 함 — 4 KF로 active window를 늘리면 매 슬라이더 변경마다 16+ LK 호출이 직렬로 일어나 인터랙션이 끊긴다. (2) 학습 목표인 "active window 변화에 따른 BA 결과"는 2 KF vs 3 KF 비교만으로도 시연 가능 — 3 KF는 별도 landmark가 추가되어 chi² histogram이 더 채워진다. (3) Phase H에서 sliding window + 영속 Map이 들어오면 active window를 진짜 3..15로 늘릴 수 있다. | Step 11 ParamPanel은 windowSize 토글 2/3만 노출. Phase H Step 12에서 본 컴포넌트가 영속 Map 입력을 받도록 확장 |
 
 ---
 
@@ -151,18 +156,20 @@
   - WASM Features 바인딩 (Step 3+4): `ch13-wasm/wasm-src/myslam/bindings/bind_features.cpp`
   - WASM Triangulation 바인딩 (Step 5+6): `ch13-wasm/wasm-src/myslam/bindings/bind_triangulation.cpp`
   - WASM PnP 바인딩 (Step 8): `ch13-wasm/wasm-src/myslam/bindings/bind_pnp.cpp`
+  - WASM BA 바인딩 (Step 11): `ch13-wasm/wasm-src/myslam/bindings/bind_ba.cpp`
   - Phase A+ 스파이크: `ch13-wasm/wasm-src/spike/{bind_pnp_spike.cpp, bind_ba_spike.cpp, verify_pnp.mjs, verify_ba.mjs, verify_pnp_diag*.mjs}`
   - Phase C 게이트 스파이크: `ch13-wasm/wasm-src/spike/{bind_cv_spike.cpp, verify_cv.ts}` — `npm run verify:cv_spike`
   - Phase C 본 작업 검증: `ch13-wasm/wasm-src/spike/verify_features.ts` — `npm run verify:features`
   - Phase D 본 작업 검증: `ch13-wasm/wasm-src/spike/verify_triangulation.ts` — `npm run verify:triangulation`
   - Phase E 본 작업 검증: `ch13-wasm/wasm-src/spike/verify_pnp.ts` — `npm run verify:pnp` (verify_pnp.mjs는 Phase A+ 아카이브로 보존)
-  - 빌드 스크립트: `ch13-wasm/wasm-src/{CMakeLists.txt, build.sh}` — `bash build.sh [baseline|simd|mt|mt-simd] [hello|camera|pnp_spike|ba_spike|cv_spike|features|triangulation|pnp]`
+  - Phase G 본 작업 검증: `ch13-wasm/wasm-src/spike/verify_ba.ts` — `npm run verify:ba` (verify_ba.mjs는 Phase A+ 아카이브로 보존)
+  - 빌드 스크립트: `ch13-wasm/wasm-src/{CMakeLists.txt, build.sh}` — `bash build.sh [baseline|simd|mt|mt-simd] [hello|camera|pnp_spike|ba_spike|cv_spike|features|triangulation|pnp|ba]`
   - OpenCV 분리 빌드 스크립트: `ch13-wasm/wasm-src/scripts/build-opencv.sh` — `npm run build:opencv:baseline`
   - g2o submodule (modern master): `ch13-wasm/wasm-src/third_party/g2o/`
   - Eigen submodule (tag 5.0.1): `ch13-wasm/wasm-src/third_party/eigen/`
   - OpenCV submodule (tag 4.13.0, shallow): `ch13-wasm/wasm-src/third_party/opencv/`
   - OpenCV 빌드 산출물: `ch13-wasm/wasm-src/build/opencv-{build,install}-<variant>/` (gitignored). install/lib에 `libopencv_{core,imgproc,features2d,video}.a`
-  - 빌드 산출물: `ch13-wasm/public/wasm/myslam_{hello,camera,pnp_spike,ba_spike,cv_spike,features,triangulation,pnp}.<variant>.{js,wasm}`
+  - 빌드 산출물: `ch13-wasm/public/wasm/myslam_{hello,camera,pnp_spike,ba_spike,cv_spike,features,triangulation,pnp,ba}.<variant>.{js,wasm}`
   - Step 3 UI: `ch13-wasm/src/steps/Step03_FeatureDetection/`
   - Step 4 UI: `ch13-wasm/src/steps/Step04_StereoMatching/`
   - Step 5 UI: `ch13-wasm/src/steps/Step05_Triangulation/`
@@ -171,10 +178,12 @@
   - Step 8 UI: `ch13-wasm/src/steps/Step08_PoseEstimation/` (features+triangulation+pnp 3-WASM 파이프라인, 라운드 슬라이더 + 막대차트)
   - Step 9 UI: `ch13-wasm/src/steps/Step09_KeyframeDecision/` (3 WASM 재사용, 3 정책 토글 + tracking_inliers 막대차트 + 결정 표)
   - Step 10 UI: `ch13-wasm/src/steps/Step10_NewMapPoints/` (lazy chunk; features+triangulation 재사용, mask 토글 + 4 KF 시퀀스 차트 + r3f Scene3D)
+  - Step 11 UI: `ch13-wasm/src/steps/Step11_BundleAdjustment/` (lazy chunk; 4-WASM 파이프라인 + active window 2/3 + chi² histogram before/after + r3f Scene3D pre/post 토글)
   - 공통 Scene3D 컴포넌트: `ch13-wasm/src/components/Scene3D.tsx` (r3f + drei)
   - TS 로더: `ch13-wasm/src/wasm/features.ts` (`loadFeaturesWasm` + `imageDataToGray`)
   - TS 로더: `ch13-wasm/src/wasm/triangulation.ts` (`loadTriangulationWasm` + `makeK` + `makeRectifiedT`)
   - TS 로더: `ch13-wasm/src/wasm/pnp.ts` (`loadPnPWasm` + `makeKMatrix` + `identityInit` + `makeInitPose6`)
+  - TS 로더: `ch13-wasm/src/wasm/ba.ts` (`loadBaWasm` + `makeBaKMatrix` + `IDENTITY_EXT12` + `makeRectifiedExt12` + `packPose12` + `identityPose12`)
 - (예정) 단계별 학습 노트: `docs/steps/NN-*.md`
 
 ---
@@ -678,6 +687,75 @@ PLAN §9 Phase C 1.5주 추정과 일치. 단, OpenCV.js 빌드 대신 **분리 
   2. `mask radius` 30 px → 2 px로 줄였을 때 새 검출이 carry-over 코너 위까지 침범하는지.
   3. r3f Scene3D에서 마우스 회전·줌으로 두 색상 클러스터의 깊이 분포가 자연스러운지.
   4. 시퀀스 차트가 #0→#1, …, #0→#4 모두 carry+new 합 ≥ 10인지(게이트와 일관).
+
+---
+
+## Phase G — Step 11 본 작업 완료 (2026-04-28)
+
+### 결과 요약
+
+| 항목 | 값 |
+|------|-----|
+| 신규 C++ | `wasm-src/myslam/bindings/bind_ba.cpp` (~390 LOC). spike의 `VertexPoseSE3`/`VertexXYZ`/`EdgeProjection`을 `myslam` 네임스페이스로 옮기고 ch13 backend.cpp::Optimize의 좌/우 cam_ext 분기 + 적응적 chi² 루프 + per-edge 메타 노출을 추가 |
+| API | `optimize(initPoses12, initLandmarks3, observations5, fixedPoseIndices, K, leftExt12, rightExt12, opts) → { refinedPoses12, refinedLandmarks3, perEdgeChi2{Initial,Final}, finalInlierMask, initial/finalChi2Sum, iterations, finalChi2Threshold, adaptiveDoublings, finalInlierRatio, P, L, O }` |
+| 옵션 노브 | `iterations`(def 10) · `chi2Init`(def 5.991) · `adaptiveRounds`(def 5) · `adaptiveInlierRatio`(def 0.5) · `useRobustKernel`(def true) · `huberDelta`(def chi2Init — 책 그대로) |
+| 솔버 | `g2o::BlockSolver<6,3>` + `g2o::LinearSolverEigen`(SimplicialLLT). 모든 landmark vertex에 `setMarginalized(true)` — Schur complement 자동 활성화. `core;stuff;solver_eigen` 3개 g2o 라이브러리만 링크 |
+| WASM 크기 | `myslam_ba.baseline.{js,wasm}` = 88 KB + **439 KB** (spike 416 KB 대비 +5%). per-edge `chi²Initial`/`chi²Final` 평탄 배열 노출 + 좌/우 ext 분기 + 적응적 루프 코드만 추가. g2o core/stuff/solver_eigen은 동일 |
+| 빌드 시간 | 단일 .cpp → ~6초 (g2o submodule는 캐시 재사용) |
+
+### `verify_ba.ts` 검증 결과 (`npm run verify:ba`)
+
+| 그룹 | 케이스 | 결과 |
+|------|--------|------|
+| Stage 2 회귀 noiseless P=3 L=20 | seed 1..3 | 3/3 PASS — chi² 20+자릿수 감소 (1.57e-24 ~ 1.93e-23), maxRot ≤ 2.5e-13 |
+| Stage 2 회귀 1px noise P=4 L=40 | seed 10..12 | 3/3 PASS — chi² 3+자릿수 감소, maxRot < 6e-3 rad |
+| 적응적 chi² 루프 (chi²_init=0.05, useRobustKernel=false) | 1 | PASS — **doublings=4, finalThr=0.80, inlierRatio=58.9%** (53/90) |
+| Stereo (left+right ext) — scale gauge 고정 | 1 | PASS — chi² 6.86e+5 → 3.44e-17, **maxLm=7.29e-12** (모노큘러 spike의 ~수 cm 드리프트와 대비) |
+
+### Step 11 — Bundle Adjustment (UI)
+
+- **파이프라인**: KF #0(앵커, fixed)에서 GFTT → stereo LK → triangulate로 world frame 정의. 다른 KF 1..(W-1)는 KF#0 left → KF j left 시간축 LK로 3D-2D 페어를 만들어 `Step 8` PnP로 초기 pose 추정. 관측은 **KF당 좌+우 두 개**(KF#0 left = GFTT seed, KF#0 right = stereo LK 결과, KF j left = 시간 LK 결과, KF j right = KF j left → KF j right 추가 stereo LK).
+- **ParamPanel**: active window 토글(2 KFs / 3 KFs), KF 인덱스(B, C) 슬라이더, `iterations`(1..30), `chi2Init`(0.5..20), `adaptive rounds`(0..8), `Huber δ`(0.1..20), `RobustKernel` 체크박스, `maxFeatures`(50..500). solver toggle은 `g2o + solver_eigen`(active) + `g2o + CXSparse`(disabled chip) + `direct LM`(disabled chip).
+- **OutputView**:
+  - **요약 텍스트**: observations / poses / LM iters / adaptive doublings / chi² init→final / drop ratio / inlier ratio / build ms / BA ms.
+  - **Pose 표**: 각 pose의 refined translation + ‖Δt‖ + Δrot(°). KF#0은 fixed로 표시.
+  - **per-edge chi² histogram (before vs after)**: 32-bin log scale, 회색 = before, 파란 = after, 빨강 점선 = 적응적 chi² 임계값. PLAN §3 Step 11 "오차 bar chart" 충족.
+  - **r3f Scene3D pre/post 토글**: 좌/우 frustum + landmark 클라우드. before(회색) vs after(노랑 inlier / 어두운 빨강 outlier) 토글.
+- **VerifyGate** (5종):
+  1. features + triangulation + pnp + ba WASM 모두 로드
+  2. 5 frames + calib 로드
+  3. observations ≥ 60 (학습 게이트)
+  4. **chi² 감소율 ≥ 30%** (PLAN §3 "≥ 40%"에서 mini fixture 합성 노이즈 부족으로 30%로 완화 — 결정 로그 참고)
+  5. 단조 수렴 (final < initial) + 유한값
+
+### 빌드/번들 검증
+
+| 항목 | 관측값 |
+|------|--------|
+| `npm run build:wasm:ba` | ✅ `myslam_ba.baseline.wasm` 439 KB |
+| `npm run verify:ba` | ✅ 10건 모두 통과 |
+| `npx tsc -b` | ✅ 0 errors |
+| `npm run build` | ✅ 초기 chunk **103.90 KB gzipped** (PLAN §10 ≤ 400 KB), Scene3D vendor chunk 245.91 KB gzip — Step 6 / Step 10 / Step 11이 공유 |
+| `GET /step/bundle-adjustment` | 200 text/html, COEP/COOP 반영 |
+| `GET /wasm/myslam_ba.baseline.{js,wasm}` | 200, COEP/COOP 반영, .wasm은 application/wasm (449 316 B) |
+
+### 의식적으로 deferred (Phase G+ 또는 Phase H로)
+
+- **CXSparse 통합** — `solver_eigen`(SimplicialLLT)이 mini fixture에서 충분히 빠르므로 Phase H Full Pipeline에서 active window 5+ KF를 측정한 후 병목이 확인되면 그 시점에 `wasm-src/third_party/cxsparse/` 벤더링 + `g2o/solvers/csparse` 활성화. Phase A+ 결정 그대로 유지.
+- **direct LM (minimal C++ 자체 구현)** — 학습용 비교 알고리즘. 다른 모든 단계가 g2o 경로로 통합돼 있어 후순위. Phase I 마감 단계에서 합류 검토.
+- **Schur on/off 토글** — `setMarginalized(true)`를 컴파일 타임에 결정하는 g2o의 솔버 구조 때문에 토글하려면 별도 솔버를 추가로 빌드해야 한다. 현재 PLAN §3의 "Schur 보완 on/off"는 disabled 안내(`Schur 보완은 항상 ON`)로 대체. Phase G+로 deferred.
+- **MT/SIMD/WebGPU 가속 경로** — PLAN §4 매트릭스의 Step 11 행. baseline만 빌드 중. Phase H BA 측정 후 일괄 도입 결정 유지.
+- **active window 3..15 KF** — mini fixture 5 프레임 + 영속 Map 부재로 현재 2/3 KF만 노출. Phase H Step 12 sliding window + 영속 KeyFrame 모델 도입 시 본 컴포넌트가 진짜 active map을 받도록 확장.
+- **OpenMP 대신 Emscripten pthreads로 BA 병렬화** — PLAN §1.3의 결정. Phase H에서 active window가 커지면 합류.
+- **벤치 차트 (`benchStore` 통합)** + **학습 노트** `docs/steps/11-*.md` — PerfMeter 본 구현 + Phase I 문서화 단계.
+
+### 남은 사용자 육안 관측
+
+- `http://localhost:5173/step/bundle-adjustment`:
+  1. `iterations` 1 → 20으로 늘리며 chi² histogram의 파란 막대가 빨강 점선 왼쪽으로 모이는지 (수렴 시각화).
+  2. `chi² init` 5.991 → 0.05로 줄이고 `useRobustKernel` 끄기 → 적응적 doublings가 4~5로 늘어나며 임계 점선이 우측으로 이동.
+  3. **3D 토글 before/after**: 회색 점 클라우드(before)에서 노랑/빨강 클라우드(after)로 전환할 때 KF#1+ frustum이 landmark 분포에 맞춰 이동·회전하는지.
+  4. `active window` 2 → 3 KFs 토글: chi² histogram의 막대 수가 늘어나고 (`L`이 같아도 `O`가 두 KF 분 더 추가됨) Pose 표에 KF idx 2 행이 등장.
 
 ---
 

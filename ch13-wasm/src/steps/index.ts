@@ -4,14 +4,18 @@ import { Step02Camera } from './Step02_Camera';
 import { Step03FeatureDetection } from './Step03_FeatureDetection';
 import { Step04StereoMatching } from './Step04_StereoMatching';
 import { Step05Triangulation } from './Step05_Triangulation';
-// Step 6 / Step 10 are r3f / drei / three-heavy → split into their own chunk
-// so the initial bundle stays under PLAN §10's 400 KB gzipped budget. Both
-// share the same `three-vendor` chunk loaded on first 3D-using route.
+// Step 6 / Step 10 / Step 11 are r3f / drei / three-heavy → split into their
+// own chunk so the initial bundle stays under PLAN §10's 400 KB gzipped
+// budget. They share the same `three-vendor` chunk loaded on first 3D-using
+// route.
 const Step06InitialMap = lazy(() =>
   import('./Step06_InitialMap').then((m) => ({ default: m.Step06InitialMap })),
 );
 const Step10NewMapPoints = lazy(() =>
   import('./Step10_NewMapPoints').then((m) => ({ default: m.Step10NewMapPoints })),
+);
+const Step11BundleAdjustment = lazy(() =>
+  import('./Step11_BundleAdjustment').then((m) => ({ default: m.Step11BundleAdjustment })),
 );
 import { Step07FrameTracking } from './Step07_FrameTracking';
 import { Step08PoseEstimation } from './Step08_PoseEstimation';
@@ -36,7 +40,7 @@ export const STEPS: StepMeta[] = [
   { id: 8,  slug: 'pose-estimation',   title: 'Pose Estimation (PnP)',         summary: 'g2o / solvePnPRansac / EPnP', Component: Step08PoseEstimation },
   { id: 9,  slug: 'keyframe',          title: 'Keyframe Decision',             summary: '키프레임 삽입 정책', Component: Step09KeyframeDecision },
   { id: 10, slug: 'new-mappoints',     title: 'New MapPoints via Keyframe',    summary: '재검출 + 재삼각화', Component: Step10NewMapPoints },
-  { id: 11, slug: 'bundle-adjustment', title: 'Bundle Adjustment',             summary: '창 단위 BA + 적응적 chi²' },
+  { id: 11, slug: 'bundle-adjustment', title: 'Bundle Adjustment',             summary: '창 단위 BA + 적응적 chi²', Component: Step11BundleAdjustment },
   { id: 12, slug: 'sliding-window',    title: 'Sliding Window',                summary: '중복 제거 vs 공간 다양성' },
   { id: 13, slug: 'full-pipeline',     title: 'Full Pipeline (End-to-End VO)', summary: '실시간 VO 궤적 + 지도' },
 ];

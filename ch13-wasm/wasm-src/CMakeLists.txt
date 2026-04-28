@@ -19,6 +19,7 @@ endif()
 #   features      (Phase C / Step 3+4) — GFTT/Harris/FAST/ORB + LK binding
 #   triangulation (Phase D / Step 5)   — Linear SVD + Midpoint triangulation
 #   pnp           (Phase E / Step 8)   — pose-only PnP via g2o (4-round outlier)
+#   ba            (Phase G / Step 11)  — sparse BA via g2o solver_eigen
 if(NOT DEFINED CH13_WASM_TARGET)
   set(CH13_WASM_TARGET "hello")
 endif()
@@ -138,7 +139,8 @@ endfunction()
 # -----------------------------------------------------------------------------
 if(CH13_WASM_TARGET STREQUAL "pnp_spike" OR
    CH13_WASM_TARGET STREQUAL "ba_spike" OR
-   CH13_WASM_TARGET STREQUAL "pnp")
+   CH13_WASM_TARGET STREQUAL "pnp" OR
+   CH13_WASM_TARGET STREQUAL "ba")
   # ch13-wasm-owned submodule (modern g2o master) — intentionally decoupled
   # from the book's pinned 3rdparty/g2o (2018) to stay compatible with a
   # modern Eigen + CMake.
@@ -235,6 +237,15 @@ if(CH13_WASM_TARGET STREQUAL "pnp_spike" OR
       myslam/bindings/bind_pnp.cpp
       createPnpModule
       "core;stuff;solver_dense")
+  endif()
+
+  if(CH13_WASM_TARGET STREQUAL "ba")
+    # Phase G / Step 11 body. Same g2o link surface as ba_spike (sparse
+    # SimplicialLLT — BA's pose+landmark graph leans on Schur complement).
+    _add_spike_target(myslam_ba
+      myslam/bindings/bind_ba.cpp
+      createBaModule
+      "core;stuff;solver_eigen")
   endif()
 endif()
 

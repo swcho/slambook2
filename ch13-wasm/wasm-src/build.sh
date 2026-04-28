@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Build a single WASM variant. Usage:
-#   bash wasm-src/build.sh [baseline|simd|mt|mt-simd] [hello|camera|pnp_spike|ba_spike|cv_spike|features|triangulation|pnp]
+#   bash wasm-src/build.sh [baseline|simd|mt|mt-simd] [hello|camera|pnp_spike|ba_spike|cv_spike|features|triangulation|pnp|ba]
 # Note: cv_spike and features require the OpenCV sub-build to have completed
 #   first (bash wasm-src/scripts/build-opencv.sh <variant>).
 set -euo pipefail
@@ -53,6 +53,7 @@ case "$TARGET" in
   features)   BUILD_TGT="myslam_features"   ; OUT_BASE="myslam_features.$VARIANT"   ;;
   triangulation) BUILD_TGT="myslam_triangulation"; OUT_BASE="myslam_triangulation.$VARIANT" ;;
   pnp)        BUILD_TGT="myslam_pnp"        ; OUT_BASE="myslam_pnp.$VARIANT"        ;;
+  ba)         BUILD_TGT="myslam_ba"         ; OUT_BASE="myslam_ba.$VARIANT"         ;;
   *) echo "unknown target: $TARGET" >&2; exit 1 ;;
 esac
 

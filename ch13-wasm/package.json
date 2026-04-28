@@ -21,6 +21,8 @@
     "verify:triangulation": "node --experimental-strip-types wasm-src/spike/verify_triangulation.ts",
     "build:wasm:pnp": "bash wasm-src/build.sh baseline pnp",
     "verify:pnp": "node --experimental-strip-types wasm-src/spike/verify_pnp.ts",
+    "build:wasm:ba": "bash wasm-src/build.sh baseline ba",
+    "verify:ba": "node --experimental-strip-types wasm-src/spike/verify_ba.ts",
     "gen:dataset": "node --experimental-strip-types scripts/gen-kitti-mini.ts"
   },
   "dependencies": {
