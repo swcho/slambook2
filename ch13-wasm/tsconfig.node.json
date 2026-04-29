@@ -13,5 +13,11 @@
     "isolatedModules": true,
     "types": ["node"]
   },
-  "include": ["vite.config.ts", "scripts/**/*.ts", "wasm-src/spike/**/*.ts"]
+  "include": [
+    "vite.config.ts",
+    "scripts/**/*.ts",
+    "wasm-src/spike/**/*.ts",
+    "src/lib/slam/se3.ts",
+    "src/lib/slam/map.ts"
+  ]
 }

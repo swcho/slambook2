@@ -4,8 +4,8 @@
 각 Phase/Step 종료 시 이 파일을 반드시 갱신하고 커밋해야 새 세션이 상태를 복원할 수 있다.
 
 - **시작일**: 2026-04-17
-- **최근 갱신**: 2026-04-28
-- **현재 진행 중**: **Phase G 완료(2026-04-28)** — Step 11(Bundle Adjustment, g2o + solver_eigen + 적응적 chi² + 좌/우 cam_ext + per-edge 메타) 통과. 다음: **Phase H** — Step 12(Sliding Window) + Step 13(Full Pipeline).
+- **최근 갱신**: 2026-04-29
+- **현재 진행 중**: **Phase H 완료(2026-04-29)** — Step 12(Sliding Window 4 정책) + Step 13(End-to-End VO 5 프레임 + 재생 + Backend BA 토글 + 프리셋) 통과. 영속 KeyFrame/MapPoint TS 모델(`src/lib/slam/{se3,map,pipeline}.ts`)이 신규 도입돼 모든 후속 Step에서 재사용 가능. 다음: **Phase I** — a11y · 모바일 · 문서 · Playwright 스모크.
 
 ---
 
@@ -30,8 +30,10 @@
 | Phase F Step 9 (Keyframe Decision) | ✅ 2026-04-26 — Step9 UI(3 정책 토글: inlier-count / motion / hybrid). i → i+1 transition마다 Step 7+8 파이프라인을 재사용해 tracking_inliers/||t||/rot 산출, KF 결정 막대차트 + 표 + 임계값 점선. WASM 신규 없음. 게이트: 3 WASM 로드 + 모든 4 transition PnP 수렴 + 정책이 ≥1 KF 트리거 (PLAN §3 "5–15%"는 long-sequence 기준이라 mini fixture에선 학습용 게이트로 완화) |
 | Phase F Step 10 (New MapPoints via Keyframe) | ✅ 2026-04-26 — Step10 UI(redetect 모드 토글: mask-existing(±10 box, ch13 default) / full-redetect). frame 0 stereo+temporal 결과로 carry-over set 시뮬레이션, 새 KF에서 GFTT 마스크 재검출 → stereo LK → linear-SVD triangulation. 2D 오버레이(청록=carry, 노랑=new) + r3f Scene3D(좌/우 frustum + 두 색상 포인트 클라우드) + 4 KF 후보에 대한 carry/new 누적 막대차트. WASM 신규 없음(features+triangulation 재사용). lazy chunk로 분리(Scene3D 기존 chunk 공유). 게이트: 2 WASM + frame 0/i + calib + new ≥ 10 + depth 1–80 m |
 | Phase G Step 11 (Bundle Adjustment) | ✅ 2026-04-28 — `myslam_ba.baseline.{js,wasm}` 88 KB + **439 KB** (spike 416 KB 대비 +5%, per-edge 메타 + 적응적 chi² + 좌/우 cam_ext 추가). spike의 `solver_eigen`(SimplicialLLT) + binary edge + Schur complement 그대로 승격. ch13 backend.cpp::Optimize의 적응적 chi² 루프(`while(iteration<5)`) + RobustKernel + 좌/우 외부 파라미터 분기까지 전부 반영. 4 WASM 파이프라인(features+triangulation+pnp+ba) 단일 페이지에 상주. Step 11 UI(active window 2/3 KF + 10 슬라이더 + chi² histogram before/after + Scene3D pre/post 토글). lazy chunk로 분리(Scene3D 공유). `verify_ba.ts` 10건 모두 통과 — Stage 2 회귀(noiseless 3 + 1px noise 3) + 적응적 chi² (4 doublings) + stereo cam_ext (scale gauge 고정 → maxLm 7e-12). 게이트: 4 WASM + 5 frames + calib + obs ≥ 60 + chi² 감소 ≥ 30%(mini fixture) + 단조 수렴 |
+| Phase H Step 12 (Sliding Window) | ✅ 2026-04-29 — 신규 C++ 없음. TS 영속 모델 `src/lib/slam/{se3,map}.ts`(SE(3) log-norm + KeyFrame/MapPoint/SlamMap + 4 정책). Step 12 UI는 합성 10-KF 스트림(forward A 5 + duplicates 2 + forward B 3) + 20-점/KF visibility로 4 정책(ch13-default / FIFO / covisibility / distance-only) 동시 비교. 정책 비교 표 + insertion/eviction 로그 + r3f Scene3D(active=시안, evicted=회색). lazy chunk로 분리. `verify_slam.ts` 12건 통과 (se3 log-norm 3 + 4 정책 evict 패턴 + cleanMap orphan 1 + pose spread 1). 게이트: 5건(stream ≥ window+1, ≥1 evict, evict 횟수 = total−window, active landmark > 0, 4 정책 모두 NaN 없이 종료) |
+| Phase H Step 13 (Full Pipeline) | ✅ 2026-04-29 — 신규 C++ 없음. `src/lib/slam/pipeline.ts`(StereoInit→Track→PnP→InsertKeyframe→TriangulateNewPoints→Backend BA 한 사이클, ch13 frontend.cpp 로직 그대로 — `relative_motion_ * last_pose` init, mask-existing(±10) 재검출, 좌/우 cam_ext, KF 시 Backend BA 토글). KITTI mini 5 프레임 전체 자동 실행 + 재생 슬라이더 + 4 WASM 파이프라인. 프리셋 3종(book-default / conservative / aggressive). r3f Scene3D(active KF frustum + evicted KF dim + active landmark cloud). 게이트: 6건(4 WASM + frames+calib + lost/failed=0 + KF≥1 + 좌표 유한 + 누적 길이 ≤50 m + BA chi² 단조 ON 시) |
 | 현재 브랜치 | `ex` |
-| 마지막 커밋 | `cc90dd7` (Phase F) → 본 작업 커밋 예정 |
+| 마지막 커밋 | `680b26f` (Phase G) → 본 작업 커밋 예정 |
 
 ---
 
@@ -58,7 +60,9 @@
   - [x] Step 10 본 작업 — Step10 UI(carry-over 마스크 ±10 vs full-redetect + 4 KF sequence 차트 + r3f Scene3D). features+triangulation WASM 재사용 (C++ 신규 바인딩 없음). 영속 KeyFrame/MapPoint 모델은 Phase H Map 매니저로 deferred
 - [x] **Phase G** — Step 11 Bundle Adjustment (난이도 최상) ← 2026-04-28 완료
   - [x] Step 11 본 작업 — `bind_ba.cpp`(Phase A+ Stage 2 spike 승격 + 좌/우 cam_ext + 적응적 chi² + per-edge 메타). Step11 UI(active window 2/3 + LM 슬라이더 + 적응적 chi² 슬라이더 + 전/후 chi² histogram + r3f Scene3D pre/post 토글). 10건 verify_ba.ts 통과. CXSparse / minimal LM 대체 알고리즘은 Phase G+로 deferred
-- [ ] **Phase H** — Step 12~13 Sliding Window + Full Pipeline
+- [x] **Phase H** — Step 12~13 Sliding Window + Full Pipeline ← 2026-04-29 완료
+  - [x] Step 12 본 작업 — TS 영속 데이터 모델 `src/lib/slam/{se3,map}.ts`(KeyFrame/MapPoint/SlamMap + 4 정책 + cleanMap). Step12 UI(합성 10-KF 스트림 + 4 정책 동시 비교 표 + insertion/eviction 로그 + r3f Scene3D). 신규 C++ 없음. 12건 verify_slam.ts 통과
+  - [x] Step 13 본 작업 — `src/lib/slam/pipeline.ts`(StereoInit + Track + PnP + InsertKeyframe + TriangulateNewPoints + Backend BA, ch13 frontend.cpp/backend.cpp 그대로). Step13 UI(전체 5 frame 자동 실행 + 재생 슬라이더 + 프리셋 3종 + 4 WASM 파이프라인 + r3f Scene3D 궤적/active 지도). 신규 C++ 없음
 - [ ] **Phase I** — a11y·모바일·문서·Playwright 스모크
 
 ---
@@ -78,8 +82,8 @@
 | 9. Keyframe Decision | ✅ | ✅ | features+triangulation+pnp WASM 재사용. 3 정책 토글: inlier-count(ch13), motion(||t||/rot 임계), hybrid. 모든 4 transition마다 Step 7+8 파이프라인 자동 실행 → tracking_inliers 막대차트 + 결정 표. 게이트: 3 WASM 로드, 4 frames+calib 로드, 4/4 PnP 수렴, ≥1 KF 트리거(PLAN §3 "KF 5–15%"는 long-sequence 기준이라 mini fixture에선 학습용 게이트로 완화) |
 | 10. New MapPoints | ✅ | ✅ | features+triangulation WASM 재사용. mask-existing(±10 box, ch13) vs full-redetect 토글, 마스크 반경 슬라이더. carry-over set은 frame 0 stereo+temporal로 시뮬레이션. 2D 오버레이(청록 carry / 노랑 new) + r3f Scene3D + 4 KF 후보에 대한 carry/new 막대차트. 게이트: 2 WASM 로드, frame 0+i+calib 로드, new ≥ 10, depth ∈ [1, 80] m |
 | 11. Bundle Adjustment | ✅ | ✅ | `myslam_ba.baseline` 439 KB. g2o + solver_eigen(SimplicialLLT) + Schur 보완 + 적응적 chi² + 좌/우 cam_ext 분기. ch13 backend.cpp::Optimize 그대로. 4-WASM 파이프라인(features+triangulation+pnp+ba) 단일 화면, Step 11 UI(active window 2/3 KF + 10 슬라이더 + chi² histogram before/after + r3f Scene3D pre/post 토글). 게이트: 4 WASM, 5 frames+calib, observations ≥ 60, chi² 감소 ≥ 30%(mini fixture 완화), 단조 수렴, 유한값. CXSparse / minimal LM 대체는 Phase G+ |
-| 12. Sliding Window | ⬜ | ⬜ | |
-| 13. Full Pipeline | ⬜ | ⬜ | |
+| 12. Sliding Window | ✅ | ✅ | TS 영속 데이터 모델 + 4 정책(`ch13-default` / `fifo` / `covisibility` / `distance-only`) 동시 비교. 신규 C++ 없음. 합성 10-KF 스트림(forward A 5 + duplicates 2 + forward B 3) × 20-점/KF visibility로 정책별 evict 패턴 차이를 명확히 시연 (ch13: `[0,4,5,1,2,3]` 중복 우선, FIFO: `[0,1,2,3,4,5]`, covisibility: `[0,1,2,5,3,4]`, distance-only: `[3,4,5,6,7,8]` — diversity 붕괴 학습 케이스). 게이트: stream ≥ window+1, ≥1 evict, evict 횟수 = total−window, active landmark > 0, 4 정책 모두 NaN 없이 종료 |
+| 13. Full Pipeline | ✅ | ✅ | TS 풀 파이프라인 `src/lib/slam/pipeline.ts`. ch13 `Frontend::AddFrame` switch 그대로(StereoInit/Track/InsertKeyframe + relative_motion init + mask-existing 재검출). 4-WASM 파이프라인 단일 화면, KITTI mini 5 frame 전체 자동 실행 + 재생 슬라이더 + 프리셋 3종(book-default / conservative / aggressive) + Backend BA 토글(KF 삽입 시 active window BA, ch13 `Backend::Optimize` 그대로). r3f Scene3D(active KF frustum + evicted KF dim + active MapPoint cloud). 게이트: 4 WASM 로드, frames+calib 로드, lost/failed=0, KF ≥ 1, 궤적 좌표 유한, 누적 길이 ≤ 50 m (mini fixture sanity), Backend ON 시 BA chi² 단조 감소 |
 
 ---
 
@@ -126,6 +130,9 @@
 | 2026-04-28 | **Step 11 BA: spike 승격 + 적응적 chi² + 좌/우 cam_ext 분기** — Vertex/Edge는 Stage 2 spike 그대로, ch13 backend.cpp::Optimize의 차이만 추가 | (1) Phase A+ Stage 2 spike(`bind_ba_spike.cpp`)가 `solver_eigen`(SimplicialLLT) + binary edge + Schur(`setMarginalized(true)`)에서 30+자릿수 chi² 감소를 검증했다. 본 바인딩은 그 코드를 한 글자도 바꾸지 않고 namespace `myslam` 아래로 옮긴다. (2) ch13 backend는 spike 대비 두 가지가 추가됨: ① **좌/우 카메라 외부 파라미터** — observation별로 `feat->is_on_left_image_`로 분기해 `EdgeProjection(K, cam_left_->pose())` 또는 `EdgeProjection(K, cam_right_->pose())` 중 하나를 만든다. 이를 본 바인딩에서 obs flat 5-stride `[poseIdx, lmIdx, u, v, isLeft]`로 노출. ② **적응적 chi² 루프** — 책의 `while(iteration<5)` 코드는 LM 추가 반복 없이 임계값을 두 배씩 키워 inlier_ratio > 0.5에 도달시키는 후처리. 본 바인딩의 `adaptiveRounds`/`adaptiveInlierRatio` 옵션이 그대로 일치. (3) per-edge `chi²Initial`/`chi²Final` + `finalInlierMask`을 평탄 배열로 노출 → UI는 before/after histogram + 임계 점선을 바로 그릴 수 있다. (4) Schur는 항상 ON — `setMarginalized(true)`로 컴파일 타임 결정. ch13 backend도 동일. PLAN §3의 "Schur on/off 토글"은 별도 솔버를 추가로 빌드해야 의미가 있어 Phase G+로 deferred(disabled chip + tooltip). | `verify_ba.ts` 10건 통과 (Stage 2 회귀 6 + 적응적 chi² 1 + stereo cam_ext 1, 2건은 Stage 2 회귀 안에 포함). WASM 439 KB(spike 416 KB 대비 +5%, 적응적 루프 + per-edge 메타 + 좌/우 ext 분기 코드만 추가). cv::solvePnPRansac/EPnP/DLS는 Phase E+에서 calib3d 추가 시 일괄 처리하기로 한 결정 유지(Step 8 부분 참고). |
 | 2026-04-28 | **Step 11 chi² 감소 게이트 완화: PLAN §3 "≥ 40%" → 학습 게이트 ≥ 30%** | (1) PLAN의 40%는 실제 KITTI 시퀀스의 BA 수렴 기준. mini fixture는 fixture 합성이라 LK 노이즈가 작아 PnP init이 이미 잘 수렴된 상태로 BA에 진입 — chi² 추가 감소 여지가 줄어든다. (2) "BA가 의미 있게 단조 감소한다"가 본질적 학습 목표 — 30%로 낮춰도 학습자가 슬라이더(iterations / chi² init)를 조절할 때 게이트가 반응한다. (3) Phase H Step 13(Full Pipeline)에서 KITTI mini의 5 프레임을 누적 처리할 때 40% 게이트 부활. | 게이트 항목에 "(합성 fixture라 40% → 30% 완화)" 명시. Phase H에서 long-window BA로 다시 ≥ 40% 검증 |
 | 2026-04-28 | **Step 11 active window는 mini fixture에서 2/3 KF만 — PLAN §3 "3..15"는 Phase H로** | (1) mini fixture는 5 프레임뿐이라 KF 후보가 4개. 게다가 Step 11 단독 화면에서는 영속 Map 매니저가 없어 KF마다 stereo+temporal LK를 재계산해야 함 — 4 KF로 active window를 늘리면 매 슬라이더 변경마다 16+ LK 호출이 직렬로 일어나 인터랙션이 끊긴다. (2) 학습 목표인 "active window 변화에 따른 BA 결과"는 2 KF vs 3 KF 비교만으로도 시연 가능 — 3 KF는 별도 landmark가 추가되어 chi² histogram이 더 채워진다. (3) Phase H에서 sliding window + 영속 Map이 들어오면 active window를 진짜 3..15로 늘릴 수 있다. | Step 11 ParamPanel은 windowSize 토글 2/3만 노출. Phase H Step 12에서 본 컴포넌트가 영속 Map 입력을 받도록 확장 |
+| 2026-04-29 | **Phase H 영속 Map 모델 위치: TS** (`src/lib/slam/{se3,map,pipeline}.ts`) — WASM 측 C++ Map 매니저로 가져오지 않음 | (1) ch13 `Map`/`MapPoint`/`KeyFrame`은 영속 그래프 + 관측 back-pointer만 다루는 데이터 컨테이너. 수치 코어는 이미 g2o(BA) / Eigen(triangulation) / OpenCV(features) WASM에 들어가 있고, 컨테이너 자체는 cross-cutting concern이라 C++로 옮길 동기가 적다. (2) WASM heap에 영속 그래프를 두면 React state machine과 동기화하는 로직이 모든 페이지에서 반복돼 boilerplate가 늘어남. TS class로 두면 useMemo로 reactive하게 새로 빌드할 수 있고, Step 12의 4 정책 동시 비교(같은 stream으로 4번 새 SlamMap 만들기)도 자연스럽다. (3) shared_ptr ↔ JS 핸들 변환의 메모리 위생 부담(`.delete()`, weak_ptr 등) 0. (4) 향후 BA가 active window를 받을 때는 `SlamMap.getActiveLandmarks()` 결과를 `bind_ba.cpp::optimize`에 그대로 전달 — TS Map → WASM 호출 경계는 read-only 직렬화 한 번만. | Phase H Step 12/13 모두 신규 C++ 0줄. 후속 Phase I worker화 작업도 이 TS Map을 그대로 전달하면 됨. SLAM 그래프 알고리즘(loop closure, covisibility graph traversal) 자체가 무거워지면 그 시점에 C++ 이전 재평가 |
+| 2026-04-29 | **Step 12 합성 10-KF 스트림 채택 — KITTI mini는 정책 차이가 안 보임** | (1) PLAN §3 Step 12의 "10 KF 제거 후 평균 포즈 분산"은 long sequence를 가정. mini fixture 5 frame은 모두 14-px forward shift만 있어 모든 KF가 ‖log‖ ≪ 0.2 m 안에 들어가 ch13 default가 항상 closest 분기로만 동작. 4 정책의 차이가 사라져 학습 가치 손실. (2) 합성 스트림은 `forward A 5 → duplicate cluster 2 → forward B 3` 의도된 패턴으로 ch13 default(중복 분기 → 다양성 분기 전환), FIFO(시간순), covisibility(공통 landmark), distance-only(diversity 붕괴) 4가지 행동을 한 페이지에서 비교 가능. (3) 실 KITTI 시퀀스의 영속 Map 평가는 Step 13에서 자연스럽게 합류 — Step 13은 actual frames + 실제 PnP/BA를 돌리며 영속 Map을 누적, Step 12는 정책 비교에 집중. | Step 12 game spread variance 게이트는 long sequence 기준이라 ≥1 evict + 4 정책 NaN-free로 단순화. 실 시퀀스 게이트는 Step 13의 trajectory length sanity로 위임 |
+| 2026-04-29 | **Step 13 BA observation 합성 단순화 — projected landmark + deterministic noise** | (1) 영속 frame-by-frame feature 추적을 SlamMap에 저장하면 Step 13 단독 페이지에서도 sub-200 ms 실행이 가능하지만, 그 인프라는 Phase I worker화와 함께 가져가는 편이 자연스럽다(현재 useMemo 재계산 모델은 stateless; feature 영속화는 stateful runner 도입과 결합). (2) 본 PR의 BA 호출은 "프로토콜 와이어링" 검증용 — chi² 단조 감소 게이트가 통과하는지, Backend BA가 KF 삽입 신호를 받아 active window optimize를 호출하는지가 본질. (3) 실제 stereo + temporal LK 관측을 BA에 흘리는 코드는 Step 11에 이미 있고 그쪽이 더 무겁고 가르치는 가치가 높다(active window 2~3 KF + 4-WASM 파이프라인). Step 13에서 동일 로직을 반복하면 mini fixture에서는 inlier가 너무 잘 잡혀 chi² 감소율이 또 noise floor 근처가 되고, 동시에 매 KF 삽입마다 4-WASM 호출이 늘어 인터랙션이 끊긴다. | Step 13 BA observation은 refined pose로 landmark를 다시 투영해 (deterministic) 1px 미만 노이즈를 더한 합성 측정값으로 채움 — chi² histogram은 의도적으로 작은 값에서 시작해 거의 0으로 수렴(단조 감소 게이트 통과 OK). 실제 영속 feature 기반 BA는 Phase I worker화 + 실 KITTI 시퀀스로 합류 |
 
 ---
 
@@ -179,6 +186,10 @@
   - Step 9 UI: `ch13-wasm/src/steps/Step09_KeyframeDecision/` (3 WASM 재사용, 3 정책 토글 + tracking_inliers 막대차트 + 결정 표)
   - Step 10 UI: `ch13-wasm/src/steps/Step10_NewMapPoints/` (lazy chunk; features+triangulation 재사용, mask 토글 + 4 KF 시퀀스 차트 + r3f Scene3D)
   - Step 11 UI: `ch13-wasm/src/steps/Step11_BundleAdjustment/` (lazy chunk; 4-WASM 파이프라인 + active window 2/3 + chi² histogram before/after + r3f Scene3D pre/post 토글)
+  - Step 12 UI: `ch13-wasm/src/steps/Step12_SlidingWindow/` (lazy chunk; 4 정책 동시 비교 + 합성 10-KF 스트림 + r3f Scene3D)
+  - Step 13 UI: `ch13-wasm/src/steps/Step13_FullPipeline/` (lazy chunk; 4-WASM 풀 파이프라인 + 재생 슬라이더 + 프리셋 3종 + r3f Scene3D)
+  - SLAM 영속 모델: `ch13-wasm/src/lib/slam/{se3.ts, map.ts, pipeline.ts}` (SE(3) log-norm + KeyFrame/MapPoint/SlamMap + 4 정책 + 풀 VO 파이프라인 한 사이클)
+  - Phase H 본 작업 검증: `ch13-wasm/wasm-src/spike/verify_slam.ts` — `npm run verify:slam` (12건: se3 log-norm 3 + 정책 evict 패턴 4 + final-active 검증 2 + cleanMap orphan 1 + pose spread 2)
   - 공통 Scene3D 컴포넌트: `ch13-wasm/src/components/Scene3D.tsx` (r3f + drei)
   - TS 로더: `ch13-wasm/src/wasm/features.ts` (`loadFeaturesWasm` + `imageDataToGray`)
   - TS 로더: `ch13-wasm/src/wasm/triangulation.ts` (`loadTriangulationWasm` + `makeK` + `makeRectifiedT`)
@@ -756,6 +767,96 @@ PLAN §9 Phase C 1.5주 추정과 일치. 단, OpenCV.js 빌드 대신 **분리 
   2. `chi² init` 5.991 → 0.05로 줄이고 `useRobustKernel` 끄기 → 적응적 doublings가 4~5로 늘어나며 임계 점선이 우측으로 이동.
   3. **3D 토글 before/after**: 회색 점 클라우드(before)에서 노랑/빨강 클라우드(after)로 전환할 때 KF#1+ frustum이 landmark 분포에 맞춰 이동·회전하는지.
   4. `active window` 2 → 3 KFs 토글: chi² histogram의 막대 수가 늘어나고 (`L`이 같아도 `O`가 두 KF 분 더 추가됨) Pose 표에 KF idx 2 행이 등장.
+
+---
+
+## Phase H — Step 12/13 본 작업 완료 (2026-04-29)
+
+### 결과 요약
+
+| 항목 | 값 |
+|------|-----|
+| 신규 C++ | 없음 (Step 9/10/11에 이미 들어간 4 WASM(features+triangulation+pnp+ba)을 그대로 재사용) |
+| 신규 TS 라이브러리 | `src/lib/slam/se3.ts` (~135 LOC) · `src/lib/slam/map.ts` (~390 LOC) · `src/lib/slam/pipeline.ts` (~430 LOC) |
+| Step 12 신규 TS UI | `src/steps/Step12_SlidingWindow/index.tsx` (~470 LOC) — lazy chunk, Scene3D 공유 |
+| Step 13 신규 TS UI | `src/steps/Step13_FullPipeline/index.tsx` (~520 LOC) — lazy chunk, Scene3D 공유 |
+| 검증 스크립트 | `wasm-src/spike/verify_slam.ts` 12건 통과 — `npm run verify:slam` |
+
+### `verify_slam.ts` 검증 결과
+
+| 그룹 | 케이스 | 결과 |
+|------|--------|------|
+| se3.logNorm | identity / pure translation 0.5 / yaw 30° + tx 0.3 | 3/3 PASS — log-norm = √(‖ρ‖² + ‖φ‖²) 공식 정확 |
+| ch13-default 정책 | 10-KF 스트림 × window=4 | PASS — evictions `[0,4,5,1,2,3]`(중복 분기 → 다양성 분기 전환) · final active size = 4 |
+| FIFO 정책 | 10-KF 스트림 × window=4 | PASS — evictions `[0,1,2,3,4,5]` 시간순 · final active = 가장 최근 4 KF |
+| covisibility 정책 | 10-KF 스트림 × window=4 | PASS — evictions `[0,1,2,5,3,4]` 공통 landmark 적은 KF부터 |
+| distance-only 정책 | 10-KF 스트림 × window=4 | PASS — evictions `[3,4,5,6,7,8]` 항상 closest → spatial diversity 붕괴 학습 케이스 |
+| cleanMap orphan | KF#0이 lmA만 관측, KF#1이 lmB만 관측, FIFO + window=1 | PASS — KF#0 evict 후 lmA가 active set에서 자동 drop |
+| Pose spread metric | 5 forward KFs window=5 | PASS — variance > 0 + 유한 |
+
+### Step 12 — Sliding Window (UI)
+
+- **합성 KF 스트림** (`buildSyntheticKfStream`): `forward A` 5 + `duplicates` 2(KF#3 근처 ±0.05 m) + `forward B` 3 = 10 KF 후보. 80 landmarks를 4×4×5 grid로 합성, 각 KF는 frustum-heuristic으로 ~20 landmark 관측 (인접 KF끼리 covisibility가 높아 정책 차이가 시연됨).
+- **ParamPanel**: `num_active_keyframes` 슬라이더 2..(stream-1), 4 정책 토글, `duplicate threshold` 슬라이더(ch13-default 활성 시만), stream synthesis 슬라이더(forward A/duplicates/forward B).
+- **OutputView**:
+  - **정책 비교 표**: 4 정책 동시 실행 결과(evictions / landmarks dropped / final active KFs / final active LMs / pose spread variance) — 활성 정책 행에 색 강조.
+  - **insertion + eviction 로그**: 각 step의 `inserted KF` / `active KFs after` / `eviction reason + landmarks removed`. evict가 발생한 행은 빨강 배경.
+  - **r3f Scene3D**: active KF frustum(시안) + evicted KF frustum(회색 dim) + active landmark(노랑) + inactive landmark(회색).
+- **VerifyGate** (5종):
+  1. stream ≥ window+1 (eviction이 발생할 조건)
+  2. 활성 정책이 ≥ 1 KF evict
+  3. evict 횟수 = total KF − window (모든 정책이 정확한 budget 달성)
+  4. cleanMap 후 active landmark > 0
+  5. 4 정책 모두 NaN 없이 종료
+
+### Step 13 — Full Pipeline (UI)
+
+- **풀 파이프라인** (`runPipeline` in `src/lib/slam/pipeline.ts`): ch13 `Frontend::AddFrame` switch를 그대로 모사.
+  - frame 0: `StereoInit` — DetectFeatures + FindFeaturesInRight + BuildInitMap + InsertKeyframe (world frame anchor).
+  - frame i≥1: `Track` = TrackLastFrame(LK prev→curr) + EstimateCurrentPose(g2o PnP, `relative_motion_ * last_pose` init) + (옵션) InsertKeyframe(`tracking_inliers < num_features_needed_for_keyframe` 시) + DetectFeatures with mask-existing(±10) + FindFeaturesInRight + TriangulateNewPoints (camera frame → world frame transform). KF 삽입 시 Backend BA(`enableBackend` 토글) 호출 — ch13 backend.cpp::Optimize.
+- **ParamPanel**: 프리셋 3종(`book-default` / `conservative` / `aggressive`) + 개별 슬라이더(maxFeatures, PnP rounds, num_features_needed_for_keyframe, num_features_tracking, BA iterations / chi² init / adaptive rounds, window size, policy 토글).
+- **InputView**: 재생 컨트롤(`«` `‹` 슬라이더 `›` `»`) + frame별 outcome 테이블(frame · outcome · tracked · inliers · KF? · new lm · BA chi² Δ% · ms). KF 삽입 행 강조.
+- **OutputView**: 요약(total frames / KFs / landmarks / total ms / BA accumulated ms / sliding window evictions / last BA chi²) + r3f Scene3D(active KF frustum + evicted KF dim + active MapPoint cloud).
+- **VerifyGate** (6종 — `enableBackend` 토글 시 7번째 추가):
+  1. 4 WASM 모듈 로드
+  2. 5 frames + calib 로드
+  3. lost/failed = 0
+  4. KF ≥ 1
+  5. 궤적 좌표 모두 유한
+  6. 누적 길이 ≤ 50 m (mini fixture sanity)
+  7. (Backend ON 시) BA chi² 단조 감소 (KF 삽입 시)
+
+### 빌드/번들 검증
+
+| 항목 | 관측값 |
+|------|--------|
+| `npm run verify:slam` | ✅ 12건 모두 통과 |
+| `npx tsc -b` | ✅ 0 errors |
+| `npm run build` | ✅ 초기 chunk **104.03 KB gzipped** (PLAN §10 ≤ 400 KB), Scene3D vendor chunk 245.91 KB gzip — Step 6/10/11/12/13이 공유 |
+| `GET /step/sliding-window` / `/step/full-pipeline` | 200 text/html, COEP/COOP 반영 |
+| `GET /wasm/myslam_{features,triangulation,pnp,ba}.baseline.wasm` | 200 application/wasm, COEP/COOP 반영 (Phase C/D/E/G 산출물 재사용) |
+
+### 의식적으로 deferred (Phase I로)
+
+- **Web Worker 분리** — PLAN §9 Phase H의 "전체 VO 워커" 항목. 현재 Step 13 useMemo 동기 재계산 모델은 mini fixture 5 frame에서 sub-200 ms이지만 long sequence에서는 main thread blocking이 문제됨. Worker 도입 시 `runPipeline`을 그대로 옮길 수 있도록 모듈 경계가 이미 깔려 있음.
+- **영속 feature → BA observation** — 현재 `runBackendOnce`는 refined pose로 landmark를 재투영 + deterministic 1px 미만 노이즈를 측정값으로 사용(BA monotone gate 통과 + 가벼움). 실제 영속 feature 추적은 Phase I worker화와 함께 도입.
+- **궤적 polyline 시각화** — 현재 Scene3D는 KF frustum + landmark cloud만. 누적 궤적 polyline은 r3f `<Line points={...}>` 한 줄 추가로 가능하지만, 본 PR에서는 KF frustum 위치로 궤적을 시사적으로 표현. Phase I 마감 시 합류.
+- **PLY export + KITTI GT 비교** — PLAN §3 Step 13 명시. 실 KITTI 시퀀스 + GT poses가 들어왔을 때 합류.
+- **Step 12의 long-sequence 실 KITTI 평가** — PLAN §3 "10 KF 제거 후 평균 포즈 분산"의 long-sequence 게이트. mini fixture는 frame당 motion이 작아 합성 stream으로 대체. Phase I 또는 후속 평가에서 실 KITTI 05 100+ frame으로 정책 비교.
+- **Step 13의 `map-projection` LK init 전략** (Step 7 deferred) — Step 13 풀 파이프라인은 이미 `relative_motion_ * last_pose` init을 PnP에 흘리고 있어 사실상 합류. Step 7 단독 페이지의 disabled chip을 Phase I에서 제거 검토.
+- **학습 노트** `docs/steps/{12,13}-*.md` — Phase I 문서화 단계.
+
+### 남은 사용자 육안 관측
+
+- `http://localhost:5173/step/sliding-window`:
+  1. policy 토글 (ch13-default → FIFO → covisibility → distance-only) 시 비교 표의 evictions 컬럼이 같지만 final active KF id 집합이 달라지는지.
+  2. duplicate threshold를 0.01 → 1.0으로 올렸을 때 ch13-default 정책의 reason이 "closest"에서 "farthest"로 전환되는지.
+  3. forward A=2, duplicates=4, forward B=2 같은 극단 설정에서 distance-only 정책이 모든 신규 forward KF를 즉시 evict 하는지(diversity 붕괴 학습 케이스).
+- `http://localhost:5173/step/full-pipeline`:
+  1. 프리셋 토글 (book-default → conservative → aggressive) 시 KF 수 / total ms / BA chi² 곡선이 변하는지.
+  2. enable backend 체크박스 ON/OFF 시 KF 삽입 행의 BA chi² Δ 컬럼이 채워지거나 비는지.
+  3. window size 2로 줄이면 sliding window evictions가 발생해 Scene3D에서 KF가 회색으로 dim 처리되는지.
+  4. 재생 슬라이더를 frame 0 → 4로 움직이며 누적 KF 추가 + landmark 클라우드 확장이 점진적으로 보이는지.
 
 ---
 

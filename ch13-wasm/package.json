@@ -23,6 +23,7 @@
     "verify:pnp": "node --experimental-strip-types wasm-src/spike/verify_pnp.ts",
     "build:wasm:ba": "bash wasm-src/build.sh baseline ba",
     "verify:ba": "node --experimental-strip-types wasm-src/spike/verify_ba.ts",
+    "verify:slam": "node --experimental-strip-types wasm-src/spike/verify_slam.ts",
     "gen:dataset": "node --experimental-strip-types scripts/gen-kitti-mini.ts"
   },
   "dependencies": {

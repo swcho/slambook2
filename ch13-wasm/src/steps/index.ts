@@ -17,6 +17,12 @@ const Step10NewMapPoints = lazy(() =>
 const Step11BundleAdjustment = lazy(() =>
   import('./Step11_BundleAdjustment').then((m) => ({ default: m.Step11BundleAdjustment })),
 );
+const Step12SlidingWindow = lazy(() =>
+  import('./Step12_SlidingWindow').then((m) => ({ default: m.Step12SlidingWindow })),
+);
+const Step13FullPipeline = lazy(() =>
+  import('./Step13_FullPipeline').then((m) => ({ default: m.Step13FullPipeline })),
+);
 import { Step07FrameTracking } from './Step07_FrameTracking';
 import { Step08PoseEstimation } from './Step08_PoseEstimation';
 import { Step09KeyframeDecision } from './Step09_KeyframeDecision';
@@ -41,6 +47,6 @@ export const STEPS: StepMeta[] = [
   { id: 9,  slug: 'keyframe',          title: 'Keyframe Decision',             summary: '키프레임 삽입 정책', Component: Step09KeyframeDecision },
   { id: 10, slug: 'new-mappoints',     title: 'New MapPoints via Keyframe',    summary: '재검출 + 재삼각화', Component: Step10NewMapPoints },
   { id: 11, slug: 'bundle-adjustment', title: 'Bundle Adjustment',             summary: '창 단위 BA + 적응적 chi²', Component: Step11BundleAdjustment },
-  { id: 12, slug: 'sliding-window',    title: 'Sliding Window',                summary: '중복 제거 vs 공간 다양성' },
-  { id: 13, slug: 'full-pipeline',     title: 'Full Pipeline (End-to-End VO)', summary: '실시간 VO 궤적 + 지도' },
+  { id: 12, slug: 'sliding-window',    title: 'Sliding Window',                summary: '중복 제거 vs 공간 다양성', Component: Step12SlidingWindow },
+  { id: 13, slug: 'full-pipeline',     title: 'Full Pipeline (End-to-End VO)', summary: '실시간 VO 궤적 + 지도', Component: Step13FullPipeline },
 ];
