@@ -24,7 +24,9 @@
     "build:wasm:ba": "bash wasm-src/build.sh baseline ba",
     "verify:ba": "node --experimental-strip-types wasm-src/spike/verify_ba.ts",
     "verify:slam": "node --experimental-strip-types wasm-src/spike/verify_slam.ts",
-    "gen:dataset": "node --experimental-strip-types scripts/gen-kitti-mini.ts"
+    "gen:dataset": "node --experimental-strip-types scripts/gen-kitti-mini.ts",
+    "test:e2e": "playwright test",
+    "test:e2e:report": "playwright show-report"
   },
   "dependencies": {
     "@react-three/drei": "^9.122.0",
@@ -38,6 +40,7 @@
     "zustand": "^5.0.2"
   },
   "devDependencies": {
+    "@playwright/test": "^1.59.1",
     "@types/node": "^25.6.0",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",

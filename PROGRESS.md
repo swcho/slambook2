@@ -5,7 +5,7 @@
 
 - **시작일**: 2026-04-17
 - **최근 갱신**: 2026-04-29
-- **현재 진행 중**: **Phase H 완료(2026-04-29)** — Step 12(Sliding Window 4 정책) + Step 13(End-to-End VO 5 프레임 + 재생 + Backend BA 토글 + 프리셋) 통과. 영속 KeyFrame/MapPoint TS 모델(`src/lib/slam/{se3,map,pipeline}.ts`)이 신규 도입돼 모든 후속 Step에서 재사용 가능. 다음: **Phase I** — a11y · 모바일 · 문서 · Playwright 스모크.
+- **현재 진행 중**: **Phase I 진행 중(2026-04-29)** — 회귀 가드를 먼저 깔기 위해 **Playwright 스모크**를 첫 슬라이스로 도입(`@playwright/test 1.59.1` + chromium 1217). `tests/e2e/smoke.spec.ts`가 Home + 13 Step 라우트 + unknown→Home 리다이렉트 = **15 케이스**를 헤드리스로 검증, **7.7s 전체 그린**. 다음 슬라이스: a11y(시멘틱/contrast/키보드), 모바일 레이아웃, dark mode, `docs/steps/*.md` 학습 노트.
 
 ---
 
@@ -32,8 +32,9 @@
 | Phase G Step 11 (Bundle Adjustment) | ✅ 2026-04-28 — `myslam_ba.baseline.{js,wasm}` 88 KB + **439 KB** (spike 416 KB 대비 +5%, per-edge 메타 + 적응적 chi² + 좌/우 cam_ext 추가). spike의 `solver_eigen`(SimplicialLLT) + binary edge + Schur complement 그대로 승격. ch13 backend.cpp::Optimize의 적응적 chi² 루프(`while(iteration<5)`) + RobustKernel + 좌/우 외부 파라미터 분기까지 전부 반영. 4 WASM 파이프라인(features+triangulation+pnp+ba) 단일 페이지에 상주. Step 11 UI(active window 2/3 KF + 10 슬라이더 + chi² histogram before/after + Scene3D pre/post 토글). lazy chunk로 분리(Scene3D 공유). `verify_ba.ts` 10건 모두 통과 — Stage 2 회귀(noiseless 3 + 1px noise 3) + 적응적 chi² (4 doublings) + stereo cam_ext (scale gauge 고정 → maxLm 7e-12). 게이트: 4 WASM + 5 frames + calib + obs ≥ 60 + chi² 감소 ≥ 30%(mini fixture) + 단조 수렴 |
 | Phase H Step 12 (Sliding Window) | ✅ 2026-04-29 — 신규 C++ 없음. TS 영속 모델 `src/lib/slam/{se3,map}.ts`(SE(3) log-norm + KeyFrame/MapPoint/SlamMap + 4 정책). Step 12 UI는 합성 10-KF 스트림(forward A 5 + duplicates 2 + forward B 3) + 20-점/KF visibility로 4 정책(ch13-default / FIFO / covisibility / distance-only) 동시 비교. 정책 비교 표 + insertion/eviction 로그 + r3f Scene3D(active=시안, evicted=회색). lazy chunk로 분리. `verify_slam.ts` 12건 통과 (se3 log-norm 3 + 4 정책 evict 패턴 + cleanMap orphan 1 + pose spread 1). 게이트: 5건(stream ≥ window+1, ≥1 evict, evict 횟수 = total−window, active landmark > 0, 4 정책 모두 NaN 없이 종료) |
 | Phase H Step 13 (Full Pipeline) | ✅ 2026-04-29 — 신규 C++ 없음. `src/lib/slam/pipeline.ts`(StereoInit→Track→PnP→InsertKeyframe→TriangulateNewPoints→Backend BA 한 사이클, ch13 frontend.cpp 로직 그대로 — `relative_motion_ * last_pose` init, mask-existing(±10) 재검출, 좌/우 cam_ext, KF 시 Backend BA 토글). KITTI mini 5 프레임 전체 자동 실행 + 재생 슬라이더 + 4 WASM 파이프라인. 프리셋 3종(book-default / conservative / aggressive). r3f Scene3D(active KF frustum + evicted KF dim + active landmark cloud). 게이트: 6건(4 WASM + frames+calib + lost/failed=0 + KF≥1 + 좌표 유한 + 누적 길이 ≤50 m + BA chi² 단조 ON 시) |
+| Phase I Playwright 스모크 | 🟡 2026-04-29 — `@playwright/test 1.59.1` + chromium 1217 도입. `tests/e2e/smoke.spec.ts` 15케이스(Home + 13 Step + unknown→/) 모두 PASS, **7.7s** 헤드리스. WebServer는 `vite preview --port 4173 --strictPort` 자동 기동. a11y / 모바일 / dark mode / docs/steps는 다음 슬라이스 |
 | 현재 브랜치 | `ex` |
-| 마지막 커밋 | `680b26f` (Phase G) → 본 작업 커밋 예정 |
+| 마지막 커밋 | `36afb22` (Phase H) → 본 작업 커밋 예정 |
 
 ---
 
@@ -64,6 +65,9 @@
   - [x] Step 12 본 작업 — TS 영속 데이터 모델 `src/lib/slam/{se3,map}.ts`(KeyFrame/MapPoint/SlamMap + 4 정책 + cleanMap). Step12 UI(합성 10-KF 스트림 + 4 정책 동시 비교 표 + insertion/eviction 로그 + r3f Scene3D). 신규 C++ 없음. 12건 verify_slam.ts 통과
   - [x] Step 13 본 작업 — `src/lib/slam/pipeline.ts`(StereoInit + Track + PnP + InsertKeyframe + TriangulateNewPoints + Backend BA, ch13 frontend.cpp/backend.cpp 그대로). Step13 UI(전체 5 frame 자동 실행 + 재생 슬라이더 + 프리셋 3종 + 4 WASM 파이프라인 + r3f Scene3D 궤적/active 지도). 신규 C++ 없음
 - [ ] **Phase I** — a11y·모바일·문서·Playwright 스모크
+  - [x] Playwright 스모크 도입 ← 2026-04-29 — `@playwright/test 1.59.1` + chromium 1217. `tests/e2e/smoke.spec.ts` 15케이스(Home + 13 Step + unknown→/) 헤드리스 PASS 7.7s. `tsconfig.test.json` 분리, `npm run test:e2e`
+  - [ ] a11y(시멘틱/contrast/키보드), 모바일 레이아웃, dark mode
+  - [ ] `docs/steps/*.md` 13건 학습 노트
 
 ---
 
@@ -133,6 +137,7 @@
 | 2026-04-29 | **Phase H 영속 Map 모델 위치: TS** (`src/lib/slam/{se3,map,pipeline}.ts`) — WASM 측 C++ Map 매니저로 가져오지 않음 | (1) ch13 `Map`/`MapPoint`/`KeyFrame`은 영속 그래프 + 관측 back-pointer만 다루는 데이터 컨테이너. 수치 코어는 이미 g2o(BA) / Eigen(triangulation) / OpenCV(features) WASM에 들어가 있고, 컨테이너 자체는 cross-cutting concern이라 C++로 옮길 동기가 적다. (2) WASM heap에 영속 그래프를 두면 React state machine과 동기화하는 로직이 모든 페이지에서 반복돼 boilerplate가 늘어남. TS class로 두면 useMemo로 reactive하게 새로 빌드할 수 있고, Step 12의 4 정책 동시 비교(같은 stream으로 4번 새 SlamMap 만들기)도 자연스럽다. (3) shared_ptr ↔ JS 핸들 변환의 메모리 위생 부담(`.delete()`, weak_ptr 등) 0. (4) 향후 BA가 active window를 받을 때는 `SlamMap.getActiveLandmarks()` 결과를 `bind_ba.cpp::optimize`에 그대로 전달 — TS Map → WASM 호출 경계는 read-only 직렬화 한 번만. | Phase H Step 12/13 모두 신규 C++ 0줄. 후속 Phase I worker화 작업도 이 TS Map을 그대로 전달하면 됨. SLAM 그래프 알고리즘(loop closure, covisibility graph traversal) 자체가 무거워지면 그 시점에 C++ 이전 재평가 |
 | 2026-04-29 | **Step 12 합성 10-KF 스트림 채택 — KITTI mini는 정책 차이가 안 보임** | (1) PLAN §3 Step 12의 "10 KF 제거 후 평균 포즈 분산"은 long sequence를 가정. mini fixture 5 frame은 모두 14-px forward shift만 있어 모든 KF가 ‖log‖ ≪ 0.2 m 안에 들어가 ch13 default가 항상 closest 분기로만 동작. 4 정책의 차이가 사라져 학습 가치 손실. (2) 합성 스트림은 `forward A 5 → duplicate cluster 2 → forward B 3` 의도된 패턴으로 ch13 default(중복 분기 → 다양성 분기 전환), FIFO(시간순), covisibility(공통 landmark), distance-only(diversity 붕괴) 4가지 행동을 한 페이지에서 비교 가능. (3) 실 KITTI 시퀀스의 영속 Map 평가는 Step 13에서 자연스럽게 합류 — Step 13은 actual frames + 실제 PnP/BA를 돌리며 영속 Map을 누적, Step 12는 정책 비교에 집중. | Step 12 game spread variance 게이트는 long sequence 기준이라 ≥1 evict + 4 정책 NaN-free로 단순화. 실 시퀀스 게이트는 Step 13의 trajectory length sanity로 위임 |
 | 2026-04-29 | **Step 13 BA observation 합성 단순화 — projected landmark + deterministic noise** | (1) 영속 frame-by-frame feature 추적을 SlamMap에 저장하면 Step 13 단독 페이지에서도 sub-200 ms 실행이 가능하지만, 그 인프라는 Phase I worker화와 함께 가져가는 편이 자연스럽다(현재 useMemo 재계산 모델은 stateless; feature 영속화는 stateful runner 도입과 결합). (2) 본 PR의 BA 호출은 "프로토콜 와이어링" 검증용 — chi² 단조 감소 게이트가 통과하는지, Backend BA가 KF 삽입 신호를 받아 active window optimize를 호출하는지가 본질. (3) 실제 stereo + temporal LK 관측을 BA에 흘리는 코드는 Step 11에 이미 있고 그쪽이 더 무겁고 가르치는 가치가 높다(active window 2~3 KF + 4-WASM 파이프라인). Step 13에서 동일 로직을 반복하면 mini fixture에서는 inlier가 너무 잘 잡혀 chi² 감소율이 또 noise floor 근처가 되고, 동시에 매 KF 삽입마다 4-WASM 호출이 늘어 인터랙션이 끊긴다. | Step 13 BA observation은 refined pose로 landmark를 다시 투영해 (deterministic) 1px 미만 노이즈를 더한 합성 측정값으로 채움 — chi² histogram은 의도적으로 작은 값에서 시작해 거의 0으로 수렴(단조 감소 게이트 통과 OK). 실제 영속 feature 기반 BA는 Phase I worker화 + 실 KITTI 시퀀스로 합류 |
+| 2026-04-29 | **Phase I 첫 슬라이스는 Playwright 스모크** — a11y/모바일/dark mode/문서보다 회귀 가드를 먼저 깔기 | (1) Phase I는 4 트랙(a11y · 모바일 · 문서 · 스모크) 합쳐 0.5주 규모. UI 손대는 트랙 3개가 회귀 위험을 가장 많이 만드므로 **스모크 그물부터 친다**. (2) `@playwright/test`는 vite plugin과 충돌 없음, vite preview를 webServer로 바로 끌어 올림. `tsconfig.test.json`을 별도 reference로 분리해 `tsc -b`가 spec까지 type-check함. (3) WASM 로딩은 헤드리스에서 무겁고 deterministic하지 않음 — 스모크 게이트는 "라우트 마운트 + h1 텍스트 + uncaught 콘솔 에러 0"까지만. WASM 수치 검증은 이미 `verify_*.ts` Node 스크립트 9종이 담당. (4) chromium 단일 프로젝트로 시작, 추후 webkit/firefox는 Phase I 마지막에 매트릭스 확장 검토 | `npm run test:e2e`로 7.7s 그린. 이후 a11y / dark mode 작업 시 매 PR 전에 같은 게이트 통과 확인. CI는 Phase I 후반에 GH Actions matrix로 합류 (PLAN §7.4) |
 
 ---
 
@@ -190,6 +195,7 @@
   - Step 13 UI: `ch13-wasm/src/steps/Step13_FullPipeline/` (lazy chunk; 4-WASM 풀 파이프라인 + 재생 슬라이더 + 프리셋 3종 + r3f Scene3D)
   - SLAM 영속 모델: `ch13-wasm/src/lib/slam/{se3.ts, map.ts, pipeline.ts}` (SE(3) log-norm + KeyFrame/MapPoint/SlamMap + 4 정책 + 풀 VO 파이프라인 한 사이클)
   - Phase H 본 작업 검증: `ch13-wasm/wasm-src/spike/verify_slam.ts` — `npm run verify:slam` (12건: se3 log-norm 3 + 정책 evict 패턴 4 + final-active 검증 2 + cleanMap orphan 1 + pose spread 2)
+  - Phase I Playwright 스모크: `ch13-wasm/{playwright.config.ts, tests/e2e/smoke.spec.ts, tsconfig.test.json}` — `npm run test:e2e` (15케이스: Home + 13 Step + unknown→/ 헤드리스 7.7s)
   - 공통 Scene3D 컴포넌트: `ch13-wasm/src/components/Scene3D.tsx` (r3f + drei)
   - TS 로더: `ch13-wasm/src/wasm/features.ts` (`loadFeaturesWasm` + `imageDataToGray`)
   - TS 로더: `ch13-wasm/src/wasm/triangulation.ts` (`loadTriangulationWasm` + `makeK` + `makeRectifiedT`)
@@ -867,3 +873,51 @@ PLAN §9 Phase C 1.5주 추정과 일치. 단, OpenCV.js 빌드 대신 **분리 
 3. **결정이 발생하면**: "주요 결정 로그"에 append-only로 한 줄 추가.
 4. **블로커 발생**: "현재 블로커"에 원인·시도한 해결책·다음 행동을 기록.
 5. **세션 종료 시**: 반드시 이 파일 갱신 후 커밋. 커밋 메시지 예: `progress: finish Phase A scaffolding`.
+
+---
+
+## Phase I — Playwright 스모크 슬라이스 (2026-04-29)
+
+### 결과 요약
+
+| 항목 | 값 |
+|------|-----|
+| devDep 추가 | `@playwright/test ^1.59.1` |
+| 브라우저 바이너리 | chromium 1217 + chromium-headless-shell 1217 (macOS arm64) — `~/Library/Caches/ms-playwright/` 캐시 |
+| 신규 파일 | `ch13-wasm/playwright.config.ts` · `ch13-wasm/tests/e2e/smoke.spec.ts` · `ch13-wasm/tsconfig.test.json` |
+| 스크립트 | `npm run test:e2e` (vite preview 자동 기동) · `npm run test:e2e:report` |
+| 헤드리스 결과 | **15 PASS / 0 FAIL** — Home + 13 Step + unknown→/ 리다이렉트, 전체 7.7s |
+| 빌드 영향 | 초기 chunk gzip 104.03 KB 변동 없음 (PLAN §10 ≤ 400 KB 충족) — 테스트 코드는 `tsconfig.test.json` 별도 reference라 vite 빌드에서 제외 |
+
+### 게이트 정책
+
+스모크는 **회귀 그물**이지 기능 검증이 아니다 — WASM 수치 정합성은 `verify_*.ts` 9종(node)에 위임.
+
+각 케이스가 통과하려면:
+1. 라우트가 200으로 마운트 (vite preview SPA fallback 그대로)
+2. `<h1>`에 해당 Step의 title이 보임 (lazy chunk + Suspense fallback 통과 확인)
+3. `pageerror` (uncaught exception) 0건
+4. tolerated console patterns(`/[vite]/`, React DevTools 안내, headless WebGL) 외의 `console.error` 0건
+
+### Playwright 설정 메모
+
+- `webServer.command`은 `npm run preview -- --host 127.0.0.1 --port 4173 --strictPort`. `PLAYWRIGHT_BASE_URL` 환경변수가 있으면 webServer 기동을 생략하므로 외부 dev 서버에 붙여 디버깅도 가능.
+- `workers: 1` 단일 워커. 브라우저 세션당 OpenCV/g2o WASM이 메모리에 동시 적재되면 8 GB+를 먹을 수 있어 직렬 실행이 안전.
+- `trace: 'retain-on-failure'`. 회귀 발생 시 `playwright-report/trace.zip`으로 분석.
+- `tsconfig.test.json`을 root tsconfig references에 추가해 `npx tsc -b`가 spec까지 strict type-check.
+
+### 의식적으로 deferred
+
+- **a11y(시멘틱/contrast/키보드 조작)**: PLAN §10 "주요 컨트롤 키보드 조작 지원, 색맹 친화 팔레트". axe-core 기반 자동 검사 + 사이드바 키보드 네비게이션은 별도 PR.
+- **모바일 레이아웃**: 현재 `App.tsx`는 260 px 사이드바 + main 2-column 그리드 고정. 모바일 (≤ 768 px) 시 사이드바를 햄버거로 전환 + Step 컴포넌트 그리드 1열 전환 필요. r3f Canvas 크기도 별도 검토.
+- **dark mode**: 현재 hard-coded dark theme. CSS variable 기반 테마 토글로 전환 + `prefers-color-scheme` 감지.
+- **`docs/steps/{01..13}-*.md` 학습 노트** (PLAN 부록 A 템플릿): Phase I 후반에 일괄 작성. 본 PR에는 없음.
+- **GH Actions CI matrix**: PLAN §7.4 "Playwright 스모크: 각 Step 화면이 로드되고 검증 게이트를 자동 프리셋으로 통과". `node-version: 22.x` + `npx playwright install --with-deps chromium` + `npm run test:e2e`. Phase I 마지막에 합류.
+- **webkit / firefox 브라우저**: chromium 단일 프로젝트로 시작. PLAN §1.4의 Safari 17.4 호환은 webkit 추가 시점에 검증.
+
+### 남은 사용자 육안 관측
+
+- (선택) `npm run test:e2e:report`로 HTML 리포트 확인 → 각 케이스의 라우트 timing이 정상인지(특히 r3f를 쓰는 Step 6/10/11/12/13가 1 s 내외에 mount 되는지).
+- 추후 a11y 작업 PR이 들어가기 전, 매번 `npm run test:e2e`가 그린인지 확인.
+
+---

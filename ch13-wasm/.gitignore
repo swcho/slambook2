@@ -3,6 +3,11 @@ dist/
 .vite/
 *.log
 
+# Playwright (e2e smoke)
+playwright-report/
+test-results/
+tsconfig.test.tsbuildinfo
+
 # WASM build outputs (built artifacts land in public/wasm via build.sh)
 public/wasm/*.wasm
 public/wasm/*.js
