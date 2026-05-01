@@ -75,3 +75,33 @@ test.describe('ch13-wasm smoke', () => {
     expect(errors, errors.join('\n')).toEqual([]);
   });
 });
+
+test.describe('ch13-wasm mobile viewport', () => {
+  test.use({ viewport: { width: 375, height: 667 } });
+
+  test('mobile: hamburger opens sidebar, link navigates and closes drawer', async ({
+    page,
+  }) => {
+    const errors = attachErrorWatcher(page);
+    await page.goto('/');
+    // Sidebar links are off-screen behind translateX(-100%) until the
+    // hamburger toggles open. So they must NOT be initially visible.
+    await expect(
+      page.getByRole('link', { name: /Dataset Loader/ }),
+    ).not.toBeVisible();
+    // Open the drawer.
+    await page.getByRole('button', { name: 'Open steps menu' }).click();
+    await expect(
+      page.getByRole('link', { name: /Dataset Loader/ }),
+    ).toBeVisible();
+    // Tap a step link → drawer auto-closes after route change.
+    await page.getByRole('link', { name: /Dataset Loader/ }).click();
+    await expect(
+      page.getByRole('heading', { level: 1, name: 'Dataset Loader (KITTI)' }),
+    ).toBeVisible({ timeout: 15_000 });
+    await expect(
+      page.getByRole('link', { name: /Dataset Loader/ }),
+    ).not.toBeVisible();
+    expect(errors, errors.join('\n')).toEqual([]);
+  });
+});

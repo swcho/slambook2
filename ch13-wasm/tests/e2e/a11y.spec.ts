@@ -62,3 +62,50 @@ test.describe('ch13-wasm a11y (axe-core, WCAG 2.1 AA)', () => {
     await expect(main).toBeFocused();
   });
 });
+
+test.describe('ch13-wasm a11y (light theme via toggle)', () => {
+  // Light theme is intentionally **shell-only** — it overrides the App
+  // sidebar + main bg + header text tokens, but the 13 Step components
+  // (Phase B–H) carry hardcoded inline dark colors (#181818, #aaa text on
+  // dark panels, etc.) that would need a full per-component sweep to
+  // re-tune for light surfaces. That refactor is deliberately deferred
+  // (see PROGRESS.md decision log 2026-05-01).
+  //
+  // Therefore we axe-scan light theme on Home only — that's the surface
+  // a light user actually sees when they first toggle. Step pages are
+  // legitimately "dark-themed bodies inside a light chrome", same idea
+  // as a light browser around a dark code editor.
+  test('light theme on / (Home): no axe violations', async ({ page }) => {
+    await page.addInitScript(() => {
+      window.localStorage.setItem('ch13wasm.theme', 'light');
+    });
+    await page.goto('/');
+    await expect(
+      page.getByRole('heading', { name: 'ch13-wasm Playground' }),
+    ).toBeVisible({ timeout: 15_000 });
+    await page.waitForLoadState('networkidle');
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+    const result = await runAxe(page);
+    expect(result.violations, JSON.stringify(result.violations, null, 2)).toEqual([]);
+  });
+
+  // Force dark prefers-color-scheme so the initial toggle button label is
+  // deterministic ("Switch to light theme") regardless of host OS pref.
+  test.describe('theme toggle', () => {
+    test.use({ colorScheme: 'dark' });
+
+    test('round-trips dark ↔ light + persists to localStorage', async ({ page }) => {
+      await page.goto('/');
+      // Default: no data-theme attribute (= dark via :root rule).
+      await expect(page.locator('html')).not.toHaveAttribute('data-theme', 'light');
+      await page.getByRole('button', { name: /Switch to light theme/i }).click();
+      await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+      const stored1 = await page.evaluate(() => localStorage.getItem('ch13wasm.theme'));
+      expect(stored1).toBe('light');
+      await page.getByRole('button', { name: /Switch to dark theme/i }).click();
+      await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+      const stored2 = await page.evaluate(() => localStorage.getItem('ch13wasm.theme'));
+      expect(stored2).toBe('dark');
+    });
+  });
+});

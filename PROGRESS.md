@@ -5,7 +5,7 @@
 
 - **시작일**: 2026-04-17
 - **최근 갱신**: 2026-05-01
-- **현재 진행 중**: **Phase I 진행 중(2026-05-01)** — 두 번째 슬라이스 **a11y 베이스라인** 완료. CSS 토큰화(`--surface-*`/`--color-fg-{strong,muted,faint}`/`--border-*`) + skip-to-content link + `<main id="main-content" tabindex="-1">` + `<nav aria-label="Steps">` + 시멘틱 landmark + focus-visible 링 + StepLayout 섹션 `aria-labelledby` + VerifyGate `role="status" aria-live="polite"` + 데코 이모지 `aria-hidden="true"` + 인라인 `#666`/`#777` → `var(--color-fg-faint)` 일괄 치환(8 step 파일) + Step 13 playback slider `aria-label="Playback frame"`. **`@axe-core/playwright 4.11`** 도입(`tests/e2e/a11y.spec.ts` 15 케이스 — Home + 13 Step + skip-link 키보드 활성화 검증, WCAG 2.1 AA 위반 0). **30/30 그린(스모크 15 + a11y 15) 28.5s**. 남은 슬라이스: 모바일 레이아웃, dark mode 토글, `docs/steps/*.md` 13건 학습 노트.
+- **현재 진행 중**: **Phase I 완료(2026-05-01)** — 4 슬라이스 모두 통과. ① Playwright 스모크(2026-04-29). ② a11y 베이스라인 + axe-core WCAG 2.1 AA 게이트(2026-05-01). ③ 모바일 반응형(햄버거 사이드바 + 1열 step 그리드 ≤768px) + dark/light 테마 토글(`data-theme` + localStorage persist). ④ `docs/steps/*.md` 13건 학습 노트. e2e **33/33 그린**(스모크 15 + 모바일 1 + a11y 15 + 라이트 테마 1 + 토글 1) **30.5s**. WCAG 2.1 AA 위반 0(dark + light/Home).
 
 ---
 
@@ -33,9 +33,10 @@
 | Phase H Step 12 (Sliding Window) | ✅ 2026-04-29 — 신규 C++ 없음. TS 영속 모델 `src/lib/slam/{se3,map}.ts`(SE(3) log-norm + KeyFrame/MapPoint/SlamMap + 4 정책). Step 12 UI는 합성 10-KF 스트림(forward A 5 + duplicates 2 + forward B 3) + 20-점/KF visibility로 4 정책(ch13-default / FIFO / covisibility / distance-only) 동시 비교. 정책 비교 표 + insertion/eviction 로그 + r3f Scene3D(active=시안, evicted=회색). lazy chunk로 분리. `verify_slam.ts` 12건 통과 (se3 log-norm 3 + 4 정책 evict 패턴 + cleanMap orphan 1 + pose spread 1). 게이트: 5건(stream ≥ window+1, ≥1 evict, evict 횟수 = total−window, active landmark > 0, 4 정책 모두 NaN 없이 종료) |
 | Phase H Step 13 (Full Pipeline) | ✅ 2026-04-29 — 신규 C++ 없음. `src/lib/slam/pipeline.ts`(StereoInit→Track→PnP→InsertKeyframe→TriangulateNewPoints→Backend BA 한 사이클, ch13 frontend.cpp 로직 그대로 — `relative_motion_ * last_pose` init, mask-existing(±10) 재검출, 좌/우 cam_ext, KF 시 Backend BA 토글). KITTI mini 5 프레임 전체 자동 실행 + 재생 슬라이더 + 4 WASM 파이프라인. 프리셋 3종(book-default / conservative / aggressive). r3f Scene3D(active KF frustum + evicted KF dim + active landmark cloud). 게이트: 6건(4 WASM + frames+calib + lost/failed=0 + KF≥1 + 좌표 유한 + 누적 길이 ≤50 m + BA chi² 단조 ON 시) |
 | Phase I Playwright 스모크 | ✅ 2026-04-29 — `@playwright/test 1.59.1` + chromium 1217 도입. `tests/e2e/smoke.spec.ts` 15케이스(Home + 13 Step + unknown→/) 모두 PASS, **7.7s** 헤드리스. WebServer는 `vite preview --port 4173 --strictPort` 자동 기동 |
-| Phase I a11y 베이스라인 | ✅ 2026-05-01 — CSS 토큰 + skip-link + 시멘틱 landmark + focus-visible + WCAG 2.1 AA 대비. `@axe-core/playwright 4.11` 도입, `tests/e2e/a11y.spec.ts` 15케이스(Home + 13 Step + 키보드 활성화) WCAG 2.1 AA 위반 0. **30/30 e2e 그린 28.5s** (스모크 15 + a11y 15) |
+| Phase I a11y 베이스라인 | ✅ 2026-05-01 — CSS 토큰 + skip-link + 시멘틱 landmark + focus-visible + WCAG 2.1 AA 대비. `@axe-core/playwright 4.11` 도입, `tests/e2e/a11y.spec.ts` 15케이스(Home + 13 Step + 키보드 활성화) WCAG 2.1 AA 위반 0 |
+| Phase I 모바일 + 테마 + 학습 노트 | ✅ 2026-05-01 — 햄버거 사이드바(≤768px) + step grid 1열 전환, `data-theme` 기반 dark/light 토글(localStorage persist), `docs/steps/*.md` 13건. e2e **33/33 그린 30.5s** (스모크 15 + 모바일 1 + a11y 15 + 라이트 테마 1 + 토글 1) |
 | 현재 브랜치 | `ex` |
-| 마지막 커밋 | `94d56ef` (Phase I 스모크) → 본 작업 커밋 예정 |
+| 마지막 커밋 | `0c024a3` (Phase I a11y) → 본 작업 커밋 예정 |
 
 ---
 
@@ -65,11 +66,12 @@
 - [x] **Phase H** — Step 12~13 Sliding Window + Full Pipeline ← 2026-04-29 완료
   - [x] Step 12 본 작업 — TS 영속 데이터 모델 `src/lib/slam/{se3,map}.ts`(KeyFrame/MapPoint/SlamMap + 4 정책 + cleanMap). Step12 UI(합성 10-KF 스트림 + 4 정책 동시 비교 표 + insertion/eviction 로그 + r3f Scene3D). 신규 C++ 없음. 12건 verify_slam.ts 통과
   - [x] Step 13 본 작업 — `src/lib/slam/pipeline.ts`(StereoInit + Track + PnP + InsertKeyframe + TriangulateNewPoints + Backend BA, ch13 frontend.cpp/backend.cpp 그대로). Step13 UI(전체 5 frame 자동 실행 + 재생 슬라이더 + 프리셋 3종 + 4 WASM 파이프라인 + r3f Scene3D 궤적/active 지도). 신규 C++ 없음
-- [ ] **Phase I** — a11y·모바일·문서·Playwright 스모크
+- [x] **Phase I** — a11y·모바일·dark mode·문서·Playwright 스모크 ← 2026-05-01 완료
   - [x] Playwright 스모크 도입 ← 2026-04-29 — `@playwright/test 1.59.1` + chromium 1217. `tests/e2e/smoke.spec.ts` 15케이스(Home + 13 Step + unknown→/) 헤드리스 PASS 7.7s. `tsconfig.test.json` 분리, `npm run test:e2e`
-  - [x] a11y 베이스라인(시멘틱/contrast/키보드) ← 2026-05-01 — CSS 토큰화 + skip-to-content + landmark + focus-visible + WCAG 2.1 AA 대비. `@axe-core/playwright 4.11`로 axe 게이트 자동화(WCAG 2.1 AA 위반 0). 30/30 e2e 그린 28.5s
-  - [ ] 모바일 레이아웃, dark mode 토글
-  - [ ] `docs/steps/*.md` 13건 학습 노트
+  - [x] a11y 베이스라인(시멘틱/contrast/키보드) ← 2026-05-01 — CSS 토큰화 + skip-to-content + landmark + focus-visible + WCAG 2.1 AA 대비. `@axe-core/playwright 4.11`로 axe 게이트 자동화(위반 0)
+  - [x] 모바일 레이아웃 ← 2026-05-01 — `@media (max-width: 768px)`로 햄버거 사이드바(translateX + visibility) + step grid 1열 전환. App.tsx에 `<button aria-expanded aria-controls>` + Esc 닫기 + 라우트 변경 시 자동 닫힘. 모바일 viewport(375×667) 스모크 케이스 추가
+  - [x] dark/light 테마 토글 ← 2026-05-01 — `:root[data-theme='light']` 토큰 정의 + 사이드바 하단 토글 버튼 + localStorage persist. **light는 shell-only**(step 컴포넌트 인라인 dark 색상 유지) — Home 라이트 테마는 axe AA 통과, step 라이트 테마는 deferred
+  - [x] `docs/steps/*.md` 13건 학습 노트 ← 2026-05-01 — PLAN 부록 A 템플릿 기반
 
 ---
 
@@ -143,6 +145,9 @@
 | 2026-05-01 | **a11y 게이트는 axe-core(WCAG 2.1 AA)만 — best-practice는 미적용** | (1) PLAN §10의 "주요 컨트롤 키보드 조작 + 색맹 친화 팔레트"는 WCAG 2.1 AA가 contractual 정의. 시각·인지 · 키보드 항목은 모두 AA 태그(`wcag2a/wcag2aa/wcag21a/wcag21aa`)에 들어 있다. (2) axe의 `best-practice` 규칙 팩(특히 `heading-order`)은 AA 외부. 본 프로젝트의 13 Step 컴포넌트가 모두 `<h1>`(StepLayout header) → `<h3>`(각 step의 ParamPanel/Input/Output 내부) 레이어로 구성돼 있어 best-practice를 켜면 13 파일을 일괄 손대야 한다 — 본 슬라이스 범위 외. (3) `<section aria-labelledby>`/`<nav aria-label>`/`role="status"`로 랜드마크는 의미적으로 정확히 라벨돼 있어 스크린리더 항목 navigation은 AA 기준으로 충분. (4) heading hierarchy 정리는 별도 follow-up 슬라이스로 분리 가능 — 그 때는 axe `best-practice`도 같이 켤 수 있다 | `tests/e2e/a11y.spec.ts`의 `WCAG_TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']`. heading-order는 의도적으로 미적용이며 향후 슬라이스에서 분리 처리 |
 | 2026-05-01 | **컬러 토큰 도입 — 인라인 색상에서 CSS variable로 일괄 전환** | (1) 기존 인라인 `#666`/`#777`/`#888` 등이 8 step 컴포넌트에 산재 — `--surface-panel-active`(#2a3d5c, 활성 사이드바)와 `--surface-panel-success`(#113a22, verified gate) 같은 lighter 표면 위에서 `#666`은 3.09:1로 AA 미달. axe-core가 5건 검출. (2) `index.css`에 `--surface-*`/`--color-fg-{strong,muted,faint}`/`--border-*`/`--focus-ring`/`--color-{link,pass,fail}` 토큰을 정의해 단일 진입점으로 전환. (3) `--color-fg-faint`를 `#aaa`로 정함(=가장 lighter 표면 #2a3d5c에서도 ≥ 4.5:1, 가장 darker #141414에서도 ≥ 6.0:1). (4) `perl -pi -e`로 8 step 파일의 `'#666'`/`'#777'`을 `'var(--color-fg-faint)'`로 일괄 치환 — 이전과 외관은 약간 밝아졌지만 AA 통과. | future dark/light mode 토글 시에도 같은 변수만 swap 하면 됨. PLAN §10의 색맹 친화 팔레트도 `--color-pass`/`--color-fail` 한 곳에서 변경 가능 |
 | 2026-05-01 | **skip-to-content link + main 포커스 타깃** — 13 링크 사이드바 nav를 키보드로 매번 통과하지 않게 | (1) ch13-wasm은 사이드바에 13 step 링크가 고정으로 노출돼 있어 키보드 사용자가 매 페이지 이동 후 main 콘텐츠로 가려면 14 Tab을 눌러야 한다. (2) `<a href="#main-content" class="skip-link">`을 App 최상단에 두고 `:focus`/`:focus-visible`에서만 노출 — 마우스 유저는 안 보임. (3) `<main id="main-content" tabindex="-1">`로 프로그래매틱 포커스 타깃 지정. tabindex=-1은 Tab 순회에 들어가지 않으면서도 `.focus()` 가능. (4) `tests/e2e/a11y.spec.ts`의 마지막 케이스가 첫 Tab → "Skip to main content" → Enter → main이 `:focus`인지를 검증 | r3f Canvas가 무거운 Step 6/10/11/12/13에서 특히 유효 — 사이드바 nav 통과 시간이 매 라우트 이동마다 절약됨 |
+| 2026-05-01 | **모바일: `transform + visibility` 양쪽 사용** — Playwright `toBeVisible()`이 `translateX(-100%)`만으로는 visible로 판정 | (1) 사이드바 닫힘 상태에서 `transform: translateX(-100%)`만 적용하면 시각적으로는 화면 밖이지만 Playwright는 layout box가 살아 있으므로 `toBeVisible()` true. (2) `visibility: hidden`을 함께 적용하면 a11y 트리/Playwright 모두 hidden으로 인식. (3) 다만 슬라이드-아웃 애니메이션 중 visibility가 즉시 hidden이 되면 transition이 끊기므로 `transition: visibility 0s linear 200ms`로 transform 종료 후에만 visibility 전환. 열림 시는 `0s linear 0s`로 즉시 visible. (4) `aria-expanded` + `aria-controls`도 함께 — 햄버거 버튼이 controlled element를 가리킴 | 본 패턴은 모바일 drawer / 모달 패널의 표준. 이후 dark mode 등에서 토글 가능 element가 늘어나도 동일 방식 사용 |
+| 2026-05-01 | **dark/light 테마는 `data-theme` 토큰 swap, light는 shell-only** | (1) `:root[data-theme='light']` 안에서 `--surface-*`/`--color-fg-*`/`--color-link` 토큰을 light 변형으로 일괄 redefine. App shell(사이드바, 메인 bg, header 텍스트)는 그대로 적용. (2) **그러나 13 step 컴포넌트는 인라인으로 `#181818`/`#222`/`#aaa` 등 dark-tuned 색을 직접 사용** — 이를 모두 토큰으로 swap하려면 13 파일 전수 sweep이 필요(별도 슬라이스). (3) 따라서 light 테마는 "light shell + dark step body"로 정의 — 마치 light browser 안의 dark code editor처럼 자연스러운 패턴. axe AA는 Home 라이트만 게이트(step pages는 dark token chain이 깨지지 않도록 의도적으로 dark 유지). (4) `prefers-color-scheme: light`를 자동 매칭으로 적용하면 step 컴포넌트의 dark 인라인 색이 light 토큰 위에 contrast 위반을 일으키므로 자동 매칭 제거 — 명시 토글만 light 활성화. (5) localStorage `ch13wasm.theme`로 사용자 선택 영속화. `<html data-theme>`의 부재는 dark default. | 후속 슬라이스에서 step 컴포넌트 인라인 색을 토큰으로 옮기면 prefers-color-scheme 자동 매칭 부활 가능. 그 시점에 light step body 토큰도 정의 + 색맹 친화 팔레트도 같이 검토 |
+| 2026-05-01 | **theme toggle 테스트는 `colorScheme: 'dark'` emulate** | (1) `Switch to ${other} theme` 버튼 라벨이 prefers-color-scheme 실제 값에 의존(theme==null + matchMedia.matches → 'light' 시 라벨이 "Switch to dark theme"). (2) Playwright의 chromium 헤드리스 device profile이 OS 기본을 따라 light가 매칭되면 라벨이 비결정적. (3) `test.use({ colorScheme: 'dark' })`로 emulate해 prefers-color-scheme: dark를 강제 → 초기 라벨이 결정론적으로 "Switch to light theme" | 모바일 / 테마 외 다른 a11y 테스트도 환경 의존성을 줄이기 위해 page-level 토큰 + emulate 패턴을 활용 |
 
 ---
 
@@ -201,8 +206,9 @@
   - SLAM 영속 모델: `ch13-wasm/src/lib/slam/{se3.ts, map.ts, pipeline.ts}` (SE(3) log-norm + KeyFrame/MapPoint/SlamMap + 4 정책 + 풀 VO 파이프라인 한 사이클)
   - Phase H 본 작업 검증: `ch13-wasm/wasm-src/spike/verify_slam.ts` — `npm run verify:slam` (12건: se3 log-norm 3 + 정책 evict 패턴 4 + final-active 검증 2 + cleanMap orphan 1 + pose spread 2)
   - Phase I Playwright 스모크: `ch13-wasm/{playwright.config.ts, tests/e2e/smoke.spec.ts, tsconfig.test.json}` — `npm run test:e2e` (15케이스: Home + 13 Step + unknown→/ 헤드리스 7.7s)
-  - Phase I a11y 스펙: `ch13-wasm/tests/e2e/a11y.spec.ts` — `@axe-core/playwright 4.11`로 WCAG 2.1 AA 위반 0 검증 (15케이스: Home + 13 Step + 키보드 skip-link 활성화)
-  - 디자인 토큰: `ch13-wasm/src/index.css` — `--surface-*` / `--color-fg-{strong,muted,faint}` / `--border-*` / `--focus-ring` / `--color-{link,pass,fail}` + `.skip-link` / `.sr-only` 유틸
+  - Phase I a11y 스펙: `ch13-wasm/tests/e2e/a11y.spec.ts` — `@axe-core/playwright 4.11`로 WCAG 2.1 AA 위반 0 검증 (Home + 13 Step + skip-link 키보드 활성화 + 라이트 테마 Home + 토글 round-trip)
+  - 디자인 토큰: `ch13-wasm/src/index.css` — `--surface-*` / `--color-fg-{strong,muted,faint}` / `--border-*` / `--focus-ring` / `--color-{link,pass,fail}` (dark + light 테마 양쪽 정의) + `.skip-link` / `.sr-only` 유틸 + `.app-shell` / `.app-sidebar` / `.app-mobile-bar` / `.step-grid` 반응형 클래스
+  - 단계별 학습 노트(13건): `docs/steps/{01-dataset, 02-camera, 03-feature-detection, 04-stereo-matching, 05-triangulation, 06-initial-map, 07-frame-tracking, 08-pose-estimation, 09-keyframe, 10-new-mappoints, 11-bundle-adjustment, 12-sliding-window, 13-full-pipeline}.md` — PLAN 부록 A 템플릿 기반
   - 공통 Scene3D 컴포넌트: `ch13-wasm/src/components/Scene3D.tsx` (r3f + drei)
   - TS 로더: `ch13-wasm/src/wasm/features.ts` (`loadFeaturesWasm` + `imageDataToGray`)
   - TS 로더: `ch13-wasm/src/wasm/triangulation.ts` (`loadTriangulationWasm` + `makeK` + `makeRectifiedT`)
@@ -969,7 +975,6 @@ PLAN §9 Phase C 1.5주 추정과 일치. 단, OpenCV.js 빌드 대신 **분리 
 ### 의식적으로 deferred
 
 - **heading-order(best-practice)**: 13 Step 컴포넌트의 ParamPanel 내부가 모두 `<h3>` 패턴 — 일괄 `<h2>`로 올리면 의미 변화 없이 13 파일을 다 만져야 한다. axe `best-practice` 활성화 + heading-order 정리는 별도 슬라이스로 분리.
-- **모바일 레이아웃 / dark mode 토글 / 학습 노트**: 다음 슬라이스. 본 슬라이스는 a11y 베이스라인만.
 - **사이드바 키보드 네비게이션 강화**: 현재 Tab + Enter로 충분히 동작. 화살표 네비게이션(`role="menu"` 같은 strong-typed 패턴)은 학습 페이지 13개 환경에서 과한 도입 — 검토 후 follow-up.
 - **Reduce-motion 지원**: r3f Canvas / drei `OrbitControls`는 자동 회전 없음 → `prefers-reduced-motion` 분기 불필요. CSS 트랜지션(skip-link 슬라이드)은 120ms로 짧아 critical 아님.
 - **Color-blind 친화 팔레트(deuter/proton)**: PLAN §10. `--color-pass`/`--color-fail` 토큰만 swap하면 됨. 별도 슬라이스로 색상 결정.
@@ -979,5 +984,56 @@ PLAN §9 Phase C 1.5주 추정과 일치. 단, OpenCV.js 빌드 대신 **분리 
 - (선택) Tab으로 사이드바 → 콘텐츠 진입 흐름 확인: Tab 한 번에 "Skip to main content" 노출 → Enter로 main 진입.
 - 키보드만으로 Step 6/10/11/12/13의 r3f Canvas 위 컨트롤(슬라이더/체크박스)을 조작 가능한지 점검 — Canvas 자체는 마우스/터치 전용(OrbitControls)이지만 ParamPanel은 키보드로 충분.
 - 추후 모바일 / dark mode 작업 시 매 PR 전에 `npm run test:e2e`가 30/30 그린인지 확인.
+
+---
+
+## Phase I — 모바일 + 테마 토글 + 학습 노트 슬라이스 (2026-05-01)
+
+### 결과 요약
+
+| 항목 | 값 |
+|------|-----|
+| 신규 파일 | `docs/steps/{01..13}-*.md` 13건 |
+| 수정 파일 | `src/App.tsx` (햄버거 토글 + 테마 토글 + Esc/route close) · `src/index.css` (light 테마 토큰 + `.app-shell`/`.app-sidebar`/`.app-mobile-bar`/`.step-grid` 클래스 + `@media (max-width: 768px)`) · `src/components/StepLayout.tsx` (`step-grid` 클래스 적용) · `tests/e2e/smoke.spec.ts` (모바일 viewport 1 케이스) · `tests/e2e/a11y.spec.ts` (라이트 테마 Home 1 + toggle round-trip 1) |
+| 빌드 영향 | 초기 chunk gzip 104.88 KB(+0.45 KB, 테마 state + 모바일 토글 React 코드. PLAN §10 ≤ 400 KB 충족) |
+| 헤드리스 결과 | **33 PASS / 0 FAIL** (스모크 15 + 모바일 1 + a11y 15 + 라이트 1 + 토글 1) — 30.5s |
+
+### 모바일 레이아웃
+
+- **Breakpoint**: `@media (max-width: 768px)` (iPhone 12 mini ~ iPad mini portrait 모두 포함)
+- **사이드바**: position: fixed + width 80vw + transform: translateX(-100%) + visibility: hidden(닫힘 시) / 0 + visible(열림 시)
+- **햄버거 버튼**: `<button aria-expanded aria-controls="app-sidebar">☰</button>` — 모바일에서만 sticky top bar에 노출
+- **Backdrop**: `.app-sidebar-backdrop[data-open=true]` 클릭 시 닫힘
+- **자동 닫힘**: ① 라우트 변경(`useLocation` watch) ② Esc 키 ③ backdrop 클릭
+- **Step grid**: `.step-grid`가 desktop `260px 1fr 1fr`에서 모바일 `1fr`로 전환 → ParamPanel/Input/Output이 세로로 나열
+
+### dark/light 테마 토글
+
+- **Activation**: 사이드바 하단의 `.theme-toggle` 버튼 (`☀ Light` / `🌙 Dark` 라벨, aria-label은 "Switch to <other> theme"으로 동적)
+- **Persistence**: `localStorage["ch13wasm.theme"] = 'dark' | 'light'`. 부재 시 `<html>`에 `data-theme` 속성 미부여 → CSS의 `:root` 룰(dark)이 default
+- **prefers-color-scheme**: 자동 매칭은 **의도적으로 비활성**(step 컴포넌트의 dark 인라인 색이 light shell과 충돌). 사용자 명시 토글만 light 활성화
+- **Light 테마 범위**: shell-only(App + StepLayout 외부 + sidebar). 13 step 내부는 dark 유지 — 의도된 디자인(light browser 안의 dark code editor 패턴)
+
+### 학습 노트 (`docs/steps/*.md`)
+
+- 13건 모두 PLAN 부록 A 템플릿 기반: 학습 목표 / C++ 원본 매핑 / UI / 알고리즘 / 가속 경로 / 검증 / 학습 노트 본문 / 의도된 실패
+- PROGRESS.md "Step 검증 게이트 통과 현황" + 결정 로그를 source of truth로 인용
+- 길이: 평균 3.3 KB(약 100 라인). Step 11/12/13은 BA + 정책 + 풀 파이프라인 비중이 커 4–5 KB
+
+### 의식적으로 deferred (Phase I+ 이후)
+
+- **light 테마의 step body 적용**: 13 step 컴포넌트의 인라인 `#181818`/`#222`/`#aaa` 등을 `var(--surface-*)`/`var(--color-fg-*)`로 토큰화하면 step 페이지도 light AA를 통과 가능. 별도 슬라이스로 일괄 sweep 권장(PR 13개 파일 변경).
+- **prefers-color-scheme 자동 매칭 부활**: 위 step 토큰화 완료 후.
+- **모바일 r3f Canvas 크기 최적화**: Step 6/10/11/12/13의 Scene3D는 grid cell 크기로 자동 fit하지만 모바일에서는 viewport 전폭에 비해 작아 보일 수 있음 — `aspect-ratio` + 줌 컨트롤 별도 검토.
+- **Web Worker로 `runPipeline` 분리**: PLAN §9 Phase H 항목 — Step 13 long sequence 시 main thread blocking 회피.
+- **GH Actions CI matrix**: `node-version: 22.x` + `npx playwright install --with-deps chromium` + `npm run test:e2e`. 33-case headless gate.
+- **webkit / firefox 브라우저**: chromium 단일 프로젝트. PLAN §1.4의 Safari 17.4 호환 검증은 webkit 추가 시점에.
+
+### 남은 사용자 육안 관측
+
+- 모바일 viewport(브라우저 DevTools 또는 실제 기기)에서 햄버거 → 사이드바 슬라이드 인 → Step 링크 탭 → 사이드바 자동 닫힘 → Step 페이지가 1열로 잘 보이는지.
+- 테마 토글 버튼을 눌러 라이트로 전환했을 때 Home은 white shell로 깔끔하지만 step 페이지는 light shell + dark step body 패턴인지 (의도된 동작).
+- localStorage가 새로고침 후에도 유지되어 마지막 선택 테마로 복원되는지.
+- `docs/steps/*.md` 13건이 GitHub UI에서 제대로 렌더링되는지(테이블, 체크박스, 코드 블록).
 
 ---

@@ -35,14 +35,7 @@ export function StepLayout({
         <div style={{ color: 'var(--color-fg-muted)' }}>{step.summary}</div>
       </header>
 
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: '260px 1fr 1fr',
-          gap: 16,
-          alignItems: 'start',
-        }}
-      >
+      <div className="step-grid">
         {paramPanel ?? <ParamPanel stepId={step.id} />}
         <section style={panelStyle} aria-labelledby={inputHeadingId}>
           <h3 id={inputHeadingId} style={h3Style}>Input</h3>

@@ -1,9 +1,22 @@
-:root {
-  color-scheme: dark;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+/* ─────────────────────────────────────────────────────────────────────
+   ch13-wasm design tokens.
 
-  /* Surfaces (dark theme baseline; reused as CSS vars so a future light
-     theme + dark-mode toggle can swap them in one place). */
+   The dark theme is the production default — every step component (Phase
+   B–H) is styled directly against these surfaces and was contrast-tuned
+   against #1a1a1a / #181818 backgrounds. The light theme overrides only
+   the *shell* tokens (App / StepLayout / common components); deeply
+   nested per-step inline colors stay dark, which is fine because every
+   step's main body sits inside a `<section>` whose surface still resolves
+   to a dark token.
+
+   Token names map to the Phase I a11y slice (2026-05-01) — see
+   PROGRESS.md "Phase I — a11y 베이스라인 슬라이스" for the AA contrast
+   ratios this palette was validated against. */
+
+:root,
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
   --surface-app: #111;
   --surface-sidebar: #1a1a1a;
   --surface-panel: #181818;
@@ -12,24 +25,60 @@
   --surface-panel-active: #2a3d5c;
   --surface-panel-success: #113a22;
 
-  /* Borders. */
   --border-subtle: #333;
   --border-muted: #555;
   --border-success: #3a6;
 
-  /* Foreground text — chosen to clear WCAG AA (4.5:1) against every surface
-     this token rides on, including the lightest ones (active = #2a3d5c,
-     success = #113a22). #aaa hits ≥4.5 on each. */
   --color-fg-strong: #fff;
   --color-fg-default: #eee;
   --color-fg-muted: #bbb;
-  --color-fg-faint: #aaa; /* was #666/#777/#888 — bumped to clear AA on every bg */
+  --color-fg-faint: #aaa;
 
-  /* Accents. */
   --color-link: #6cf;
   --color-pass: #6c6;
   --color-fail: #d77;
   --focus-ring: #6cf;
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+
+  /* Light shell — verified against axe-core. The step components (Phase
+     B+) keep their dark inline backgrounds, so light mode here is a shell
+     theme that surrounds dark step bodies. Deferred: full light tokens
+     for every step's inline `#181818` panels. */
+  --surface-app: #fff;
+  --surface-sidebar: #f4f4f4;
+  --surface-panel: #fafafa;
+  --surface-panel-deep: #f0f0f0;
+  --surface-panel-faint: #f5f5f5;
+  --surface-panel-active: #cfdcef;
+  --surface-panel-success: #d4f0e0;
+
+  --border-subtle: #ddd;
+  --border-muted: #bbb;
+  --border-success: #2c8a4f;
+
+  --color-fg-strong: #000;
+  --color-fg-default: #1a1a1a;
+  --color-fg-muted: #444;
+  --color-fg-faint: #555;
+
+  --color-link: #0050b8;
+  --color-pass: #167a3a;
+  --color-fail: #b3261e;
+  --focus-ring: #0050b8;
+}
+
+/* Note on prefers-color-scheme: deliberately not auto-applied. The Step
+   components (Phase B–H) carry hard-coded dark inline backgrounds (#181818,
+   #222 etc) for things like ParamPanel sub-sections, and a light shell on
+   top of those would create dark-on-light text where the step's own dark
+   text token still resolves. Defaulting to the dark palette and offering
+   light only as an explicit user toggle keeps the page coherent. */
+
+:root {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
 body {
@@ -46,17 +95,13 @@ code {
   font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
 }
 
-/* Visible focus ring for keyboard navigation. We rely on :focus-visible so
-   pointer clicks don't show the ring; keyboard / screen-reader users always
-   do. */
 *:focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
   border-radius: 2px;
 }
 
-/* Skip-to-content link: visible only when focused (Tab from the address bar
-   lands on it first). Lets keyboard users bypass the 13-link sidebar nav. */
+/* ─── skip-to-content link ─────────────────────────────────────────── */
 .skip-link {
   position: absolute;
   left: 8px;
@@ -74,7 +119,6 @@ code {
   top: 8px;
 }
 
-/* sr-only utility for visually hidden but screen-reader-accessible text. */
 .sr-only {
   position: absolute;
   width: 1px;
@@ -87,8 +131,118 @@ code {
   border: 0;
 }
 
-/* Main content target — the skip-link jumps here. tabindex=-1 lets focus
-   move programmatically without inserting #main-content into the tab order. */
 main:focus {
   outline: none;
+}
+
+/* ─── App shell layout (responsive) ─────────────────────────────────── */
+.app-shell {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  min-height: 100vh;
+}
+
+.app-sidebar {
+  border-right: 1px solid var(--border-subtle);
+  padding: 12px;
+  overflow-y: auto;
+  background: var(--surface-sidebar);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.app-main {
+  padding: 24px;
+  overflow: auto;
+}
+
+.app-mobile-bar {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--surface-sidebar);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.app-mobile-bar button {
+  font-size: 18px;
+  background: transparent;
+  color: var(--color-fg-strong);
+  border: 1px solid var(--border-muted);
+  border-radius: 4px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.app-sidebar-backdrop {
+  display: none;
+}
+
+.theme-toggle {
+  margin-top: auto;
+  align-self: flex-end;
+  padding: 4px 8px;
+  background: transparent;
+  color: var(--color-fg-default);
+  border: 1px solid var(--border-muted);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+/* Step grid: ParamPanel + Input + Output → single column on small screens. */
+.step-grid {
+  display: grid;
+  grid-template-columns: 260px 1fr 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+@media (max-width: 768px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+  }
+  .app-mobile-bar {
+    display: flex;
+  }
+  .app-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 80vw;
+    max-width: 320px;
+    z-index: 200;
+    transform: translateX(-100%);
+    visibility: hidden;
+    /* visibility transition delayed so the slide-out completes before
+       the element disappears from a11y / Playwright visibility checks. */
+    transition: transform 200ms ease-out, visibility 0s linear 200ms;
+  }
+  .app-sidebar[data-open='true'] {
+    transform: translateX(0);
+    visibility: visible;
+    transition: transform 200ms ease-out, visibility 0s linear 0s;
+  }
+  .app-sidebar-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 150;
+  }
+  .app-sidebar-backdrop[data-open='true'] {
+    display: block;
+  }
+  .app-main {
+    padding: 16px;
+  }
+  .step-grid {
+    grid-template-columns: 1fr;
+  }
 }
