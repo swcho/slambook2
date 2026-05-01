@@ -10,7 +10,9 @@
       "Bash(/opt/homebrew/Cellar/emscripten/5.0.6/libexec/emcc.py --version)",
       "Bash(/opt/homebrew/bin/python3 --version)",
       "Bash(/Users/swcho/.claude/skills/chrome-cdp/scripts/cdp.mjs *)",
-      "Bash(EMSDK_PYTHON=/opt/homebrew/opt/python@3.14/bin/python3.14 emcc --version)"
+      "Bash(EMSDK_PYTHON=/opt/homebrew/opt/python@3.14/bin/python3.14 emcc --version)",
+      "Bash(rtk *)",
+      "Bash(npm run *)"
     ]
   }
 }

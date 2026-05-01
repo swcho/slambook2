@@ -12,3 +12,32 @@
 : 1776515927:0;claude --version
 : 1776515930:0;claude
 : 1776565356:0;flash-man file-v2
+: 1777054292:0;claude
+: 1777056710:0;cd ch13-wasm
+: 1777056711:0;ll
+: 1777056721:0;npm run dev
+: 1777139160:0;claude
+: 1777141258:0;exit
+: 1777141266:0;claude
+: 1777145268:0;npm run dev
+: 1777145290:0;cd ch13-wasm
+: 1777145293:0;npm run dev
+: 1777163847:0;claude
+: 1777175428:0;npm run dev
+: 1777175707:0;claude
+: 1777178045:0;npm run dev
+: 1777178153:0;claude
+: 1777187017:0;brew install rtk
+: 1777187048:0;rtk init -g
+: 1777187072:0;ls
+: 1777187074:0;ll
+: 1777187076:0;ls
+: 1777187087:0;tree
+: 1777187097:0;rtk ls
+: 1777192075:0;claude
+: 1777194607:0;npm run dev
+: 1777194802:0;claude
+: 1777377210:0;npm run dev
+: 1777377217:0;cd ch13-wasm
+: 1777377219:0;npm run dev
+: 1777377733:0;claude

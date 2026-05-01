@@ -1,5 +1,6 @@
 {
     "files.associations": {
         "iostream": "cpp"
-    }
+    },
+    "cmake.sourceDirectory": "/Users/swcho/projects/swcho/slambook2/ch13-wasm/wasm-src"
 }
