@@ -1,15 +1,94 @@
 :root {
-  color-scheme: light dark;
+  color-scheme: dark;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+
+  /* Surfaces (dark theme baseline; reused as CSS vars so a future light
+     theme + dark-mode toggle can swap them in one place). */
+  --surface-app: #111;
+  --surface-sidebar: #1a1a1a;
+  --surface-panel: #181818;
+  --surface-panel-deep: #141414;
+  --surface-panel-faint: #161616;
+  --surface-panel-active: #2a3d5c;
+  --surface-panel-success: #113a22;
+
+  /* Borders. */
+  --border-subtle: #333;
+  --border-muted: #555;
+  --border-success: #3a6;
+
+  /* Foreground text — chosen to clear WCAG AA (4.5:1) against every surface
+     this token rides on, including the lightest ones (active = #2a3d5c,
+     success = #113a22). #aaa hits ≥4.5 on each. */
+  --color-fg-strong: #fff;
+  --color-fg-default: #eee;
+  --color-fg-muted: #bbb;
+  --color-fg-faint: #aaa; /* was #666/#777/#888 — bumped to clear AA on every bg */
+
+  /* Accents. */
+  --color-link: #6cf;
+  --color-pass: #6c6;
+  --color-fail: #d77;
+  --focus-ring: #6cf;
 }
+
 body {
   margin: 0;
-  background: #111;
-  color: #eee;
+  background: var(--surface-app);
+  color: var(--color-fg-default);
 }
+
 a {
-  color: #6cf;
+  color: var(--color-link);
 }
+
 code {
   font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+}
+
+/* Visible focus ring for keyboard navigation. We rely on :focus-visible so
+   pointer clicks don't show the ring; keyboard / screen-reader users always
+   do. */
+*:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* Skip-to-content link: visible only when focused (Tab from the address bar
+   lands on it first). Lets keyboard users bypass the 13-link sidebar nav. */
+.skip-link {
+  position: absolute;
+  left: 8px;
+  top: -40px;
+  z-index: 1000;
+  padding: 8px 12px;
+  background: var(--surface-panel-active);
+  color: var(--color-fg-strong);
+  border-radius: 4px;
+  text-decoration: none;
+  transition: top 120ms ease-in;
+}
+.skip-link:focus,
+.skip-link:focus-visible {
+  top: 8px;
+}
+
+/* sr-only utility for visually hidden but screen-reader-accessible text. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Main content target — the skip-link jumps here. tabindex=-1 lets focus
+   move programmatically without inserting #main-content into the tab order. */
+main:focus {
+  outline: none;
 }

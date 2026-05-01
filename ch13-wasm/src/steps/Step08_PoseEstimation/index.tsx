@@ -532,7 +532,7 @@ function OutputView({
           {' '}PnP <strong>{result.pnpMs.toFixed(1)} ms</strong>
         </div>
       ) : (
-        <div style={{ fontSize: 12, color: '#666' }}>(waiting for inputs)</div>
+        <div style={{ fontSize: 12, color: 'var(--color-fg-faint)' }}>(waiting for inputs)</div>
       )}
 
       {result && (
@@ -690,7 +690,7 @@ const algoBtn: React.CSSProperties = {
 const algoBtnDisabled: React.CSSProperties = {
   ...algoBtn,
   background: '#1a1a1a',
-  color: '#666',
+  color: 'var(--color-fg-faint)',
   border: '1px dashed #444',
   cursor: 'not-allowed',
 };

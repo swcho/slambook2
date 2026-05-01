@@ -462,7 +462,7 @@ function Slider({
 }
 
 function InputView({ frames }: { frames: StereoFrame[] | null }) {
-  if (!frames) return <div style={{ color: '#666', fontSize: 12 }}>loading mini sequence…</div>;
+  if (!frames) return <div style={{ color: 'var(--color-fg-faint)', fontSize: 12 }}>loading mini sequence…</div>;
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
       <div style={{ fontSize: 12, color: '#888' }}>
@@ -513,7 +513,7 @@ function OutputView({
   params: Step9Params;
 }) {
   if (!transitions || !decisions) {
-    return <div style={{ color: '#666', fontSize: 12 }}>(running pipeline over transitions…)</div>;
+    return <div style={{ color: 'var(--color-fg-faint)', fontSize: 12 }}>(running pipeline over transitions…)</div>;
   }
   const kfCount = decisions.filter((d) => d.isKeyframe).length;
   const kfRate = decisions.length > 0 ? kfCount / decisions.length : 0;
@@ -679,7 +679,7 @@ const algoBtn: React.CSSProperties = {
 const algoBtnDisabled: React.CSSProperties = {
   ...algoBtn,
   background: '#1a1a1a',
-  color: '#666',
+  color: 'var(--color-fg-faint)',
   border: '1px dashed #444',
   cursor: 'not-allowed',
 };

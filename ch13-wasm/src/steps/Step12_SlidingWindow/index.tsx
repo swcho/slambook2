@@ -452,7 +452,7 @@ function EvictionLog({ insertions }: { insertions: Insertion[] }) {
                       {evicted.landmarksRemoved > 0 ? ` (−${evicted.landmarksRemoved} lm)` : null}
                     </span>
                   ) : (
-                    <span style={{ color: '#777' }}>—</span>
+                    <span style={{ color: 'var(--color-fg-faint)' }}>—</span>
                   )}
                 </td>
               </tr>

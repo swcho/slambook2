@@ -248,7 +248,7 @@ export function Step06InitialMap() {
           {sceneOk ? (
             <Scene3D width={520} height={380} frustums={frustums} pointCloud={pointCloud} initialDistance={20} />
           ) : (
-            <div style={{ fontSize: 12, color: '#666' }}>대기 중…</div>
+            <div style={{ fontSize: 12, color: 'var(--color-fg-faint)' }}>대기 중…</div>
           )}
         </div>
       }

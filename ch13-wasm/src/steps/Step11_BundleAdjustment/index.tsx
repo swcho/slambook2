@@ -514,7 +514,7 @@ function Slider({
 }
 
 function InputView({ frames, kfIndices }: { frames: StereoFrame[] | null; kfIndices: number[] }) {
-  if (!frames) return <div style={{ color: '#666' }}>(loading frames…)</div>;
+  if (!frames) return <div style={{ color: 'var(--color-fg-faint)' }}>(loading frames…)</div>;
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       <div style={{ fontSize: 12, color: '#888' }}>
@@ -560,7 +560,7 @@ function OutputView({
   baseline: number;
 }) {
   if (!result) {
-    return <div style={{ color: '#666' }}>(waiting for inputs)</div>;
+    return <div style={{ color: 'var(--color-fg-faint)' }}>(waiting for inputs)</div>;
   }
   const dropRatio =
     result.initialChi2Sum > 0
@@ -850,7 +850,7 @@ const algoBtn: React.CSSProperties = {
 const algoBtnDisabled: React.CSSProperties = {
   ...algoBtn,
   background: '#1a1a1a',
-  color: '#666',
+  color: 'var(--color-fg-faint)',
   border: '1px dashed #444',
   cursor: 'not-allowed',
 };

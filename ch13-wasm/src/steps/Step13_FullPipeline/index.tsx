@@ -393,6 +393,7 @@ function PlaybackControls({
       <button type="button" onClick={() => goto(playbackFrame - 1)} style={playBtn}>‹</button>
       <input
         type="range"
+        aria-label="Playback frame"
         min={0}
         max={numFrames - 1}
         step={1}
@@ -411,7 +412,7 @@ function PlaybackControls({
 
 function OutputView({ result, playbackFrame }: { result: PipelineRunResult | null; playbackFrame: number }) {
   if (!result) {
-    return <div style={{ color: '#666' }}>(running pipeline…)</div>;
+    return <div style={{ color: 'var(--color-fg-faint)' }}>(running pipeline…)</div>;
   }
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>

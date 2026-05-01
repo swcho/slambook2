@@ -6,15 +6,16 @@ export function PerfMeter({ stepId }: { stepId: number }) {
   const last = samples.at(-1);
   return (
     <section
+      aria-label="Performance meter"
       style={{
-        border: '1px solid #333',
+        border: '1px solid var(--border-subtle)',
         borderRadius: 6,
         padding: 10,
         display: 'flex',
         gap: 16,
         fontSize: 13,
-        color: '#ccc',
-        background: '#141414',
+        color: 'var(--color-fg-default)',
+        background: 'var(--surface-panel-deep)',
       }}
     >
       <span>
@@ -23,7 +24,7 @@ export function PerfMeter({ stepId }: { stepId: number }) {
       <span>
         samples: <strong>{samples.length}</strong>
       </span>
-      <span style={{ color: '#666' }}>
+      <span style={{ color: 'var(--color-fg-faint)' }}>
         (PerfMeter skeleton — uPlot 차트는 Phase C+에서 연결)
       </span>
     </section>

@@ -435,7 +435,7 @@ function ParamPanel({
             borderRadius: 4,
             border: '1px dashed #444',
             background: '#1a1a1a',
-            color: '#666',
+            color: 'var(--color-fg-faint)',
             fontSize: 13,
             cursor: 'not-allowed',
           }}

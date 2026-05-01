@@ -499,7 +499,7 @@ function Slider({
 }
 
 function InputView({ frames, kfIndex }: { frames: StereoFrame[] | null; kfIndex: number }) {
-  if (!frames) return <div style={{ color: '#666', fontSize: 12 }}>loading…</div>;
+  if (!frames) return <div style={{ color: 'var(--color-fg-faint)', fontSize: 12 }}>loading…</div>;
   const prev = frames[0];
   const kf = frames[kfIndex];
   if (!prev || !kf) return null;
@@ -570,7 +570,7 @@ function OutputView({
   }, [result]);
 
   if (!frame || !result || !cloud) {
-    return <div style={{ color: '#666', fontSize: 12 }}>(running re-detection + triangulation…)</div>;
+    return <div style={{ color: 'var(--color-fg-faint)', fontSize: 12 }}>(running re-detection + triangulation…)</div>;
   }
   const totalMs = result.detectMs + result.stereoMs + result.triMs + result.trackMs;
 

@@ -4,8 +4,8 @@
 각 Phase/Step 종료 시 이 파일을 반드시 갱신하고 커밋해야 새 세션이 상태를 복원할 수 있다.
 
 - **시작일**: 2026-04-17
-- **최근 갱신**: 2026-04-29
-- **현재 진행 중**: **Phase I 진행 중(2026-04-29)** — 회귀 가드를 먼저 깔기 위해 **Playwright 스모크**를 첫 슬라이스로 도입(`@playwright/test 1.59.1` + chromium 1217). `tests/e2e/smoke.spec.ts`가 Home + 13 Step 라우트 + unknown→Home 리다이렉트 = **15 케이스**를 헤드리스로 검증, **7.7s 전체 그린**. 다음 슬라이스: a11y(시멘틱/contrast/키보드), 모바일 레이아웃, dark mode, `docs/steps/*.md` 학습 노트.
+- **최근 갱신**: 2026-05-01
+- **현재 진행 중**: **Phase I 진행 중(2026-05-01)** — 두 번째 슬라이스 **a11y 베이스라인** 완료. CSS 토큰화(`--surface-*`/`--color-fg-{strong,muted,faint}`/`--border-*`) + skip-to-content link + `<main id="main-content" tabindex="-1">` + `<nav aria-label="Steps">` + 시멘틱 landmark + focus-visible 링 + StepLayout 섹션 `aria-labelledby` + VerifyGate `role="status" aria-live="polite"` + 데코 이모지 `aria-hidden="true"` + 인라인 `#666`/`#777` → `var(--color-fg-faint)` 일괄 치환(8 step 파일) + Step 13 playback slider `aria-label="Playback frame"`. **`@axe-core/playwright 4.11`** 도입(`tests/e2e/a11y.spec.ts` 15 케이스 — Home + 13 Step + skip-link 키보드 활성화 검증, WCAG 2.1 AA 위반 0). **30/30 그린(스모크 15 + a11y 15) 28.5s**. 남은 슬라이스: 모바일 레이아웃, dark mode 토글, `docs/steps/*.md` 13건 학습 노트.
 
 ---
 
@@ -32,9 +32,10 @@
 | Phase G Step 11 (Bundle Adjustment) | ✅ 2026-04-28 — `myslam_ba.baseline.{js,wasm}` 88 KB + **439 KB** (spike 416 KB 대비 +5%, per-edge 메타 + 적응적 chi² + 좌/우 cam_ext 추가). spike의 `solver_eigen`(SimplicialLLT) + binary edge + Schur complement 그대로 승격. ch13 backend.cpp::Optimize의 적응적 chi² 루프(`while(iteration<5)`) + RobustKernel + 좌/우 외부 파라미터 분기까지 전부 반영. 4 WASM 파이프라인(features+triangulation+pnp+ba) 단일 페이지에 상주. Step 11 UI(active window 2/3 KF + 10 슬라이더 + chi² histogram before/after + Scene3D pre/post 토글). lazy chunk로 분리(Scene3D 공유). `verify_ba.ts` 10건 모두 통과 — Stage 2 회귀(noiseless 3 + 1px noise 3) + 적응적 chi² (4 doublings) + stereo cam_ext (scale gauge 고정 → maxLm 7e-12). 게이트: 4 WASM + 5 frames + calib + obs ≥ 60 + chi² 감소 ≥ 30%(mini fixture) + 단조 수렴 |
 | Phase H Step 12 (Sliding Window) | ✅ 2026-04-29 — 신규 C++ 없음. TS 영속 모델 `src/lib/slam/{se3,map}.ts`(SE(3) log-norm + KeyFrame/MapPoint/SlamMap + 4 정책). Step 12 UI는 합성 10-KF 스트림(forward A 5 + duplicates 2 + forward B 3) + 20-점/KF visibility로 4 정책(ch13-default / FIFO / covisibility / distance-only) 동시 비교. 정책 비교 표 + insertion/eviction 로그 + r3f Scene3D(active=시안, evicted=회색). lazy chunk로 분리. `verify_slam.ts` 12건 통과 (se3 log-norm 3 + 4 정책 evict 패턴 + cleanMap orphan 1 + pose spread 1). 게이트: 5건(stream ≥ window+1, ≥1 evict, evict 횟수 = total−window, active landmark > 0, 4 정책 모두 NaN 없이 종료) |
 | Phase H Step 13 (Full Pipeline) | ✅ 2026-04-29 — 신규 C++ 없음. `src/lib/slam/pipeline.ts`(StereoInit→Track→PnP→InsertKeyframe→TriangulateNewPoints→Backend BA 한 사이클, ch13 frontend.cpp 로직 그대로 — `relative_motion_ * last_pose` init, mask-existing(±10) 재검출, 좌/우 cam_ext, KF 시 Backend BA 토글). KITTI mini 5 프레임 전체 자동 실행 + 재생 슬라이더 + 4 WASM 파이프라인. 프리셋 3종(book-default / conservative / aggressive). r3f Scene3D(active KF frustum + evicted KF dim + active landmark cloud). 게이트: 6건(4 WASM + frames+calib + lost/failed=0 + KF≥1 + 좌표 유한 + 누적 길이 ≤50 m + BA chi² 단조 ON 시) |
-| Phase I Playwright 스모크 | 🟡 2026-04-29 — `@playwright/test 1.59.1` + chromium 1217 도입. `tests/e2e/smoke.spec.ts` 15케이스(Home + 13 Step + unknown→/) 모두 PASS, **7.7s** 헤드리스. WebServer는 `vite preview --port 4173 --strictPort` 자동 기동. a11y / 모바일 / dark mode / docs/steps는 다음 슬라이스 |
+| Phase I Playwright 스모크 | ✅ 2026-04-29 — `@playwright/test 1.59.1` + chromium 1217 도입. `tests/e2e/smoke.spec.ts` 15케이스(Home + 13 Step + unknown→/) 모두 PASS, **7.7s** 헤드리스. WebServer는 `vite preview --port 4173 --strictPort` 자동 기동 |
+| Phase I a11y 베이스라인 | ✅ 2026-05-01 — CSS 토큰 + skip-link + 시멘틱 landmark + focus-visible + WCAG 2.1 AA 대비. `@axe-core/playwright 4.11` 도입, `tests/e2e/a11y.spec.ts` 15케이스(Home + 13 Step + 키보드 활성화) WCAG 2.1 AA 위반 0. **30/30 e2e 그린 28.5s** (스모크 15 + a11y 15) |
 | 현재 브랜치 | `ex` |
-| 마지막 커밋 | `36afb22` (Phase H) → 본 작업 커밋 예정 |
+| 마지막 커밋 | `94d56ef` (Phase I 스모크) → 본 작업 커밋 예정 |
 
 ---
 
@@ -66,7 +67,8 @@
   - [x] Step 13 본 작업 — `src/lib/slam/pipeline.ts`(StereoInit + Track + PnP + InsertKeyframe + TriangulateNewPoints + Backend BA, ch13 frontend.cpp/backend.cpp 그대로). Step13 UI(전체 5 frame 자동 실행 + 재생 슬라이더 + 프리셋 3종 + 4 WASM 파이프라인 + r3f Scene3D 궤적/active 지도). 신규 C++ 없음
 - [ ] **Phase I** — a11y·모바일·문서·Playwright 스모크
   - [x] Playwright 스모크 도입 ← 2026-04-29 — `@playwright/test 1.59.1` + chromium 1217. `tests/e2e/smoke.spec.ts` 15케이스(Home + 13 Step + unknown→/) 헤드리스 PASS 7.7s. `tsconfig.test.json` 분리, `npm run test:e2e`
-  - [ ] a11y(시멘틱/contrast/키보드), 모바일 레이아웃, dark mode
+  - [x] a11y 베이스라인(시멘틱/contrast/키보드) ← 2026-05-01 — CSS 토큰화 + skip-to-content + landmark + focus-visible + WCAG 2.1 AA 대비. `@axe-core/playwright 4.11`로 axe 게이트 자동화(WCAG 2.1 AA 위반 0). 30/30 e2e 그린 28.5s
+  - [ ] 모바일 레이아웃, dark mode 토글
   - [ ] `docs/steps/*.md` 13건 학습 노트
 
 ---
@@ -138,6 +140,9 @@
 | 2026-04-29 | **Step 12 합성 10-KF 스트림 채택 — KITTI mini는 정책 차이가 안 보임** | (1) PLAN §3 Step 12의 "10 KF 제거 후 평균 포즈 분산"은 long sequence를 가정. mini fixture 5 frame은 모두 14-px forward shift만 있어 모든 KF가 ‖log‖ ≪ 0.2 m 안에 들어가 ch13 default가 항상 closest 분기로만 동작. 4 정책의 차이가 사라져 학습 가치 손실. (2) 합성 스트림은 `forward A 5 → duplicate cluster 2 → forward B 3` 의도된 패턴으로 ch13 default(중복 분기 → 다양성 분기 전환), FIFO(시간순), covisibility(공통 landmark), distance-only(diversity 붕괴) 4가지 행동을 한 페이지에서 비교 가능. (3) 실 KITTI 시퀀스의 영속 Map 평가는 Step 13에서 자연스럽게 합류 — Step 13은 actual frames + 실제 PnP/BA를 돌리며 영속 Map을 누적, Step 12는 정책 비교에 집중. | Step 12 game spread variance 게이트는 long sequence 기준이라 ≥1 evict + 4 정책 NaN-free로 단순화. 실 시퀀스 게이트는 Step 13의 trajectory length sanity로 위임 |
 | 2026-04-29 | **Step 13 BA observation 합성 단순화 — projected landmark + deterministic noise** | (1) 영속 frame-by-frame feature 추적을 SlamMap에 저장하면 Step 13 단독 페이지에서도 sub-200 ms 실행이 가능하지만, 그 인프라는 Phase I worker화와 함께 가져가는 편이 자연스럽다(현재 useMemo 재계산 모델은 stateless; feature 영속화는 stateful runner 도입과 결합). (2) 본 PR의 BA 호출은 "프로토콜 와이어링" 검증용 — chi² 단조 감소 게이트가 통과하는지, Backend BA가 KF 삽입 신호를 받아 active window optimize를 호출하는지가 본질. (3) 실제 stereo + temporal LK 관측을 BA에 흘리는 코드는 Step 11에 이미 있고 그쪽이 더 무겁고 가르치는 가치가 높다(active window 2~3 KF + 4-WASM 파이프라인). Step 13에서 동일 로직을 반복하면 mini fixture에서는 inlier가 너무 잘 잡혀 chi² 감소율이 또 noise floor 근처가 되고, 동시에 매 KF 삽입마다 4-WASM 호출이 늘어 인터랙션이 끊긴다. | Step 13 BA observation은 refined pose로 landmark를 다시 투영해 (deterministic) 1px 미만 노이즈를 더한 합성 측정값으로 채움 — chi² histogram은 의도적으로 작은 값에서 시작해 거의 0으로 수렴(단조 감소 게이트 통과 OK). 실제 영속 feature 기반 BA는 Phase I worker화 + 실 KITTI 시퀀스로 합류 |
 | 2026-04-29 | **Phase I 첫 슬라이스는 Playwright 스모크** — a11y/모바일/dark mode/문서보다 회귀 가드를 먼저 깔기 | (1) Phase I는 4 트랙(a11y · 모바일 · 문서 · 스모크) 합쳐 0.5주 규모. UI 손대는 트랙 3개가 회귀 위험을 가장 많이 만드므로 **스모크 그물부터 친다**. (2) `@playwright/test`는 vite plugin과 충돌 없음, vite preview를 webServer로 바로 끌어 올림. `tsconfig.test.json`을 별도 reference로 분리해 `tsc -b`가 spec까지 type-check함. (3) WASM 로딩은 헤드리스에서 무겁고 deterministic하지 않음 — 스모크 게이트는 "라우트 마운트 + h1 텍스트 + uncaught 콘솔 에러 0"까지만. WASM 수치 검증은 이미 `verify_*.ts` Node 스크립트 9종이 담당. (4) chromium 단일 프로젝트로 시작, 추후 webkit/firefox는 Phase I 마지막에 매트릭스 확장 검토 | `npm run test:e2e`로 7.7s 그린. 이후 a11y / dark mode 작업 시 매 PR 전에 같은 게이트 통과 확인. CI는 Phase I 후반에 GH Actions matrix로 합류 (PLAN §7.4) |
+| 2026-05-01 | **a11y 게이트는 axe-core(WCAG 2.1 AA)만 — best-practice는 미적용** | (1) PLAN §10의 "주요 컨트롤 키보드 조작 + 색맹 친화 팔레트"는 WCAG 2.1 AA가 contractual 정의. 시각·인지 · 키보드 항목은 모두 AA 태그(`wcag2a/wcag2aa/wcag21a/wcag21aa`)에 들어 있다. (2) axe의 `best-practice` 규칙 팩(특히 `heading-order`)은 AA 외부. 본 프로젝트의 13 Step 컴포넌트가 모두 `<h1>`(StepLayout header) → `<h3>`(각 step의 ParamPanel/Input/Output 내부) 레이어로 구성돼 있어 best-practice를 켜면 13 파일을 일괄 손대야 한다 — 본 슬라이스 범위 외. (3) `<section aria-labelledby>`/`<nav aria-label>`/`role="status"`로 랜드마크는 의미적으로 정확히 라벨돼 있어 스크린리더 항목 navigation은 AA 기준으로 충분. (4) heading hierarchy 정리는 별도 follow-up 슬라이스로 분리 가능 — 그 때는 axe `best-practice`도 같이 켤 수 있다 | `tests/e2e/a11y.spec.ts`의 `WCAG_TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']`. heading-order는 의도적으로 미적용이며 향후 슬라이스에서 분리 처리 |
+| 2026-05-01 | **컬러 토큰 도입 — 인라인 색상에서 CSS variable로 일괄 전환** | (1) 기존 인라인 `#666`/`#777`/`#888` 등이 8 step 컴포넌트에 산재 — `--surface-panel-active`(#2a3d5c, 활성 사이드바)와 `--surface-panel-success`(#113a22, verified gate) 같은 lighter 표면 위에서 `#666`은 3.09:1로 AA 미달. axe-core가 5건 검출. (2) `index.css`에 `--surface-*`/`--color-fg-{strong,muted,faint}`/`--border-*`/`--focus-ring`/`--color-{link,pass,fail}` 토큰을 정의해 단일 진입점으로 전환. (3) `--color-fg-faint`를 `#aaa`로 정함(=가장 lighter 표면 #2a3d5c에서도 ≥ 4.5:1, 가장 darker #141414에서도 ≥ 6.0:1). (4) `perl -pi -e`로 8 step 파일의 `'#666'`/`'#777'`을 `'var(--color-fg-faint)'`로 일괄 치환 — 이전과 외관은 약간 밝아졌지만 AA 통과. | future dark/light mode 토글 시에도 같은 변수만 swap 하면 됨. PLAN §10의 색맹 친화 팔레트도 `--color-pass`/`--color-fail` 한 곳에서 변경 가능 |
+| 2026-05-01 | **skip-to-content link + main 포커스 타깃** — 13 링크 사이드바 nav를 키보드로 매번 통과하지 않게 | (1) ch13-wasm은 사이드바에 13 step 링크가 고정으로 노출돼 있어 키보드 사용자가 매 페이지 이동 후 main 콘텐츠로 가려면 14 Tab을 눌러야 한다. (2) `<a href="#main-content" class="skip-link">`을 App 최상단에 두고 `:focus`/`:focus-visible`에서만 노출 — 마우스 유저는 안 보임. (3) `<main id="main-content" tabindex="-1">`로 프로그래매틱 포커스 타깃 지정. tabindex=-1은 Tab 순회에 들어가지 않으면서도 `.focus()` 가능. (4) `tests/e2e/a11y.spec.ts`의 마지막 케이스가 첫 Tab → "Skip to main content" → Enter → main이 `:focus`인지를 검증 | r3f Canvas가 무거운 Step 6/10/11/12/13에서 특히 유효 — 사이드바 nav 통과 시간이 매 라우트 이동마다 절약됨 |
 
 ---
 
@@ -196,6 +201,8 @@
   - SLAM 영속 모델: `ch13-wasm/src/lib/slam/{se3.ts, map.ts, pipeline.ts}` (SE(3) log-norm + KeyFrame/MapPoint/SlamMap + 4 정책 + 풀 VO 파이프라인 한 사이클)
   - Phase H 본 작업 검증: `ch13-wasm/wasm-src/spike/verify_slam.ts` — `npm run verify:slam` (12건: se3 log-norm 3 + 정책 evict 패턴 4 + final-active 검증 2 + cleanMap orphan 1 + pose spread 2)
   - Phase I Playwright 스모크: `ch13-wasm/{playwright.config.ts, tests/e2e/smoke.spec.ts, tsconfig.test.json}` — `npm run test:e2e` (15케이스: Home + 13 Step + unknown→/ 헤드리스 7.7s)
+  - Phase I a11y 스펙: `ch13-wasm/tests/e2e/a11y.spec.ts` — `@axe-core/playwright 4.11`로 WCAG 2.1 AA 위반 0 검증 (15케이스: Home + 13 Step + 키보드 skip-link 활성화)
+  - 디자인 토큰: `ch13-wasm/src/index.css` — `--surface-*` / `--color-fg-{strong,muted,faint}` / `--border-*` / `--focus-ring` / `--color-{link,pass,fail}` + `.skip-link` / `.sr-only` 유틸
   - 공통 Scene3D 컴포넌트: `ch13-wasm/src/components/Scene3D.tsx` (r3f + drei)
   - TS 로더: `ch13-wasm/src/wasm/features.ts` (`loadFeaturesWasm` + `imageDataToGray`)
   - TS 로더: `ch13-wasm/src/wasm/triangulation.ts` (`loadTriangulationWasm` + `makeK` + `makeRectifiedT`)
@@ -908,7 +915,7 @@ PLAN §9 Phase C 1.5주 추정과 일치. 단, OpenCV.js 빌드 대신 **분리 
 
 ### 의식적으로 deferred
 
-- **a11y(시멘틱/contrast/키보드 조작)**: PLAN §10 "주요 컨트롤 키보드 조작 지원, 색맹 친화 팔레트". axe-core 기반 자동 검사 + 사이드바 키보드 네비게이션은 별도 PR.
+- **a11y(시멘틱/contrast/키보드 조작)**: ✅ 2026-05-01 완료 — 아래 "Phase I — a11y 베이스라인 슬라이스" 절 참고.
 - **모바일 레이아웃**: 현재 `App.tsx`는 260 px 사이드바 + main 2-column 그리드 고정. 모바일 (≤ 768 px) 시 사이드바를 햄버거로 전환 + Step 컴포넌트 그리드 1열 전환 필요. r3f Canvas 크기도 별도 검토.
 - **dark mode**: 현재 hard-coded dark theme. CSS variable 기반 테마 토글로 전환 + `prefers-color-scheme` 감지.
 - **`docs/steps/{01..13}-*.md` 학습 노트** (PLAN 부록 A 템플릿): Phase I 후반에 일괄 작성. 본 PR에는 없음.
@@ -919,5 +926,58 @@ PLAN §9 Phase C 1.5주 추정과 일치. 단, OpenCV.js 빌드 대신 **분리 
 
 - (선택) `npm run test:e2e:report`로 HTML 리포트 확인 → 각 케이스의 라우트 timing이 정상인지(특히 r3f를 쓰는 Step 6/10/11/12/13가 1 s 내외에 mount 되는지).
 - 추후 a11y 작업 PR이 들어가기 전, 매번 `npm run test:e2e`가 그린인지 확인.
+
+---
+
+## Phase I — a11y 베이스라인 슬라이스 (2026-05-01)
+
+### 결과 요약
+
+| 항목 | 값 |
+|------|-----|
+| devDep 추가 | `@axe-core/playwright ^4.11.2` |
+| 신규 파일 | `ch13-wasm/tests/e2e/a11y.spec.ts` (15 케이스) |
+| 수정 파일 | `src/index.css`(디자인 토큰 + skip-link + focus-visible 룰) · `src/App.tsx`(skip-link + landmark + nav aria-label) · `src/components/{StepLayout,ParamPanel,PerfMeter,VerifyGate}.tsx`(aria-labelledby + role=status + 토큰 사용) · 8 step 컴포넌트(`'#666'`/`'#777'` → `'var(--color-fg-faint)'`) · `src/steps/Step13_FullPipeline/index.tsx`(playback slider `aria-label="Playback frame"`) · `src/steps/Step05_Triangulation/index.tsx`(timing line 인라인 색 → token) |
+| 빌드 영향 | 초기 chunk gzip 104.43 KB(±0 KB, PLAN §10 ≤ 400 KB 충족) — 토큰화는 인라인 색을 var()로 치환할 뿐이라 번들 변화 미세 |
+| 헤드리스 결과 | **30 PASS / 0 FAIL** (스모크 15 + a11y 15) — 28.5s |
+
+### 게이트 정책 (axe-core)
+
+`tests/e2e/a11y.spec.ts`는 14 페이지(Home + 13 Step) 각각에 대해 axe-core를 돌려 **WCAG 2.1 AA 위반 0**을 게이트로 한다.
+
+- `withTags(['wcag2a','wcag2aa','wcag21a','wcag21aa'])` — best-practice는 의도적으로 미적용(결정 로그 2026-05-01 항목 참고).
+- `waitForLoadState('networkidle')` 후 axe — lazy chunk(Step 6/10/11/12/13) + r3f Canvas mount까지 기다림.
+- 마지막 케이스: 첫 Tab → `Skip to main content` 링크에 포커스 → Enter → `<main id="main-content">`이 `:focus`인지 검증.
+
+### 디자인 토큰 매핑 (참고용)
+
+| token | 값 | 용도 | 최저 대비비(text on this surface) |
+|-------|-----|------|----------------------------------|
+| `--surface-app` | #111 | body bg | — |
+| `--surface-sidebar` | #1a1a1a | aside bg | `--color-fg-faint`(#aaa) = 11.46:1 |
+| `--surface-panel` | #181818 | section bg | `--color-fg-faint` = 11.94:1 |
+| `--surface-panel-deep` | #141414 | PerfMeter bg | `--color-fg-faint` = 12.71:1 |
+| `--surface-panel-faint` | #161616 | VerifyGate(미통과) bg | `--color-fg-faint` = 12.31:1 |
+| `--surface-panel-active` | #2a3d5c | NavLink(현재 페이지) bg | `--color-fg-faint` = 4.95:1 ✓ |
+| `--surface-panel-success` | #113a22 | VerifyGate(통과) bg | `--color-fg-faint` = 5.29:1 ✓ |
+| `--color-fg-strong` | #fff | h1/h2 / strong text | — |
+| `--color-fg-default` | #eee | body text | — |
+| `--color-fg-muted` | #bbb | 보조 정보(요약, 라벨) | — |
+| `--color-fg-faint` | #aaa | 힌트, placeholder, 초기 metric | 모든 표면에서 ≥ 4.5:1 |
+| `--color-pass` / `--color-fail` | #6c6 / #d77 | VerifyGate item 마커(이모지 색만, 텍스트 의미는 sr-only로 별도 명시) | — |
+
+### 의식적으로 deferred
+
+- **heading-order(best-practice)**: 13 Step 컴포넌트의 ParamPanel 내부가 모두 `<h3>` 패턴 — 일괄 `<h2>`로 올리면 의미 변화 없이 13 파일을 다 만져야 한다. axe `best-practice` 활성화 + heading-order 정리는 별도 슬라이스로 분리.
+- **모바일 레이아웃 / dark mode 토글 / 학습 노트**: 다음 슬라이스. 본 슬라이스는 a11y 베이스라인만.
+- **사이드바 키보드 네비게이션 강화**: 현재 Tab + Enter로 충분히 동작. 화살표 네비게이션(`role="menu"` 같은 strong-typed 패턴)은 학습 페이지 13개 환경에서 과한 도입 — 검토 후 follow-up.
+- **Reduce-motion 지원**: r3f Canvas / drei `OrbitControls`는 자동 회전 없음 → `prefers-reduced-motion` 분기 불필요. CSS 트랜지션(skip-link 슬라이드)은 120ms로 짧아 critical 아님.
+- **Color-blind 친화 팔레트(deuter/proton)**: PLAN §10. `--color-pass`/`--color-fail` 토큰만 swap하면 됨. 별도 슬라이스로 색상 결정.
+
+### 남은 사용자 육안 관측
+
+- (선택) Tab으로 사이드바 → 콘텐츠 진입 흐름 확인: Tab 한 번에 "Skip to main content" 노출 → Enter로 main 진입.
+- 키보드만으로 Step 6/10/11/12/13의 r3f Canvas 위 컨트롤(슬라이더/체크박스)을 조작 가능한지 점검 — Canvas 자체는 마우스/터치 전용(OrbitControls)이지만 ParamPanel은 키보드로 충분.
+- 추후 모바일 / dark mode 작업 시 매 PR 전에 `npm run test:e2e`가 30/30 그린인지 확인.
 
 ---

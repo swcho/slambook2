@@ -507,7 +507,7 @@ function OutputView({
         </div>
       )}
       {result && (
-        <div style={{ fontSize: 11, color: '#666' }}>
+        <div style={{ fontSize: 11, color: 'var(--color-fg-faint)' }}>
           detect {result.detectMs.toFixed(1)} ms · LK {result.lkMs.toFixed(1)} ms · triangulate {result.triMs.toFixed(1)} ms
           {cameraL && <> · K_l fx = {cameraL.fx.toFixed(2)}</>}
         </div>
