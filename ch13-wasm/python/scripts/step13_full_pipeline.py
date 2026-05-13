@@ -35,6 +35,7 @@ from myslam_ref.keyframe import decide_inlier_threshold
 from myslam_ref.pnp import estimate_pose
 from myslam_ref.slam_map import Policy, PolicyOptions, SlamMap
 from myslam_ref.triangulation import Algo, triangulate
+from myslam_ref.viz import draw_trajectory_3d  # noqa: F401
 
 # %%
 ds = load_kitti_mini()
@@ -129,6 +130,30 @@ total_distance = float(np.linalg.norm(ts[-1] - ts[0]))
 print(f"  total displacement: {total_distance:.3f} m")
 assert total_distance > 0.1, f"trajectory total displacement {total_distance} m surprisingly small"
 assert all(d < 5.0 for d in distances), "an inter-frame jump > 5 m suggests divergence"
+
+# %% [markdown]
+# ## 4. 시각화 — final trajectory + landmark cloud
+
+# %%
+import matplotlib.pyplot as plt
+
+fig_tj = draw_trajectory_3d(
+    trajectory,
+    landmarks=landmarks_world,
+    title=f"VO on KITTI mini · {len(trajectory)} frames · total {total_distance:.3f} m",
+)
+
+# %%
+# 프레임별 카메라 z translation 추이 (T_cw 의 마지막 컬럼).
+fig_tz, ax_tz = plt.subplots(figsize=(7, 3))
+ax_tz.plot(range(len(ts)), ts[:, 0], label="tx", marker="o")
+ax_tz.plot(range(len(ts)), ts[:, 1], label="ty", marker="o")
+ax_tz.plot(range(len(ts)), ts[:, 2], label="tz", marker="o")
+ax_tz.set_xlabel("frame")
+ax_tz.set_ylabel("T_cw translation component (m)")
+ax_tz.set_title("Step 13 · per-frame T_cw translation")
+ax_tz.grid(alpha=0.3); ax_tz.legend()
+fig_tz.tight_layout()
 
 # %%
 print(f"\nOK — step13 full pipeline: {len(trajectory)} poses + {smap.num_active_keyframes}-KF active window")

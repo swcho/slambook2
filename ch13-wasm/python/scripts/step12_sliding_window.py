@@ -28,6 +28,7 @@ import numpy as np
 
 from myslam_ref.se3 import se3_from_translation, se3_log_norm
 from myslam_ref.slam_map import Policy, PolicyOptions, SlamMap, build_synthetic_kf_stream
+from myslam_ref.viz import draw_eviction_events, draw_trajectory_3d  # noqa: F401
 
 # %% [markdown]
 # ## 1. se3_log_norm sanity (verify_slam.ts §se3.logNorm)
@@ -110,6 +111,30 @@ for i, pose in enumerate(stream["poses"]):
 _mean, variance, n = smap.active_pose_spread()
 print(f"5 forward KFs: pose spread variance = {variance:.4f} over {n} KFs")
 assert variance > 0 and np.isfinite(variance)
+
+# %% [markdown]
+# ## 5. 시각화 — eviction 타임라인 + 합성 KF stream trajectory
+
+# %%
+# Re-run ch13-default and capture eviction step by step for the plot.
+stream_viz = build_synthetic_kf_stream(5, 2, 3)
+smap_viz = SlamMap(num_active_keyframes=4)
+for lp in stream_viz["landmark_positions"]:
+    smap_viz.insert_map_point(lp)
+ev_steps = []
+ev_ids: list[int | None] = []
+for i, pose in enumerate(stream_viz["poses"]):
+    _, ev = smap_viz.insert_keyframe(i, pose, stream_viz["observed_landmark_ids"][i], "ch13-default", PolicyOptions(0.2))
+    ev_steps.append(i)
+    ev_ids.append(ev.evicted_kf_id if ev else None)
+fig_ev = draw_eviction_events(ev_steps, ev_ids, title="ch13-default policy · KF insertion → eviction events")
+
+# %%
+fig_tj = draw_trajectory_3d(
+    stream_viz["poses"],
+    landmarks=stream_viz["landmark_positions"],
+    title="synthetic KF stream · trajectory (5 forward + 2 dup + 3 forward)",
+)
 
 # %%
 print("OK — step12 SlamMap: 4 policies + cleanMap + pose spread all consistent with verify_slam.ts")

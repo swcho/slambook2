@@ -31,6 +31,7 @@ import numpy as np
 from myslam_ref.dataset import load_kitti_mini
 from myslam_ref.features import Detector, detect, track_lk
 from myslam_ref.triangulation import Algo, triangulate
+from myslam_ref.viz import draw_keypoints, draw_mask_overlay, draw_pointcloud_3d  # noqa: F401
 
 # %%
 ds = load_kitti_mini()
@@ -89,6 +90,29 @@ new_pts3 = triangulate(new_seeds, new_tracked, k_arr, T_l, k_arr, T_r)
 new_accepted = new_pts3[new_pts3[:, 4] > 0.5]
 print(f"new landmarks accepted: {new_accepted.shape[0]}/{new_seeds.shape[0]}")
 assert new_accepted.shape[0] >= 10
+
+# %% [markdown]
+# ## 4. 시각화 — 마스크 영역 + 기존/신규 keypoint overlay + 신규 cloud
+
+# %%
+import matplotlib.pyplot as plt
+
+fig_mask = draw_mask_overlay(left0, mask, title=f"Mask of ±{PAD} px halos around {existing_pts.shape[0]} existing tracks")
+
+# %%
+fig_kp, ax_kp = plt.subplots(figsize=(12, 4))
+ax_kp.imshow(left0, cmap="gray", vmin=0, vmax=255)
+ax_kp.scatter(existing_pts[:, 0], existing_pts[:, 1], s=10, edgecolors="cyan", facecolors="none", label=f"existing ({existing_pts.shape[0]})")
+ax_kp.scatter(new_seeds[:, 0], new_seeds[:, 1], s=10, edgecolors="lime", facecolors="none", label=f"new ({new_seeds.shape[0]})")
+ax_kp.set_title("Step 10 · existing (cyan) vs newly detected (lime)")
+ax_kp.axis("off"); ax_kp.legend(loc="upper right")
+fig_kp.tight_layout()
+
+# %%
+fig_pc = draw_pointcloud_3d(
+    new_accepted[:, :3],
+    title=f"New landmarks added by Step 10 ({new_accepted.shape[0]} points)",
+)
 
 # %%
 print(f"OK — step10 new map points: produced {new_accepted.shape[0]} fresh landmarks under mask exclusion")

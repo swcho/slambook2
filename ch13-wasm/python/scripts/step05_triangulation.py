@@ -29,6 +29,7 @@ if str(_ROOT) not in sys.path:
 import numpy as np
 
 from myslam_ref.triangulation import Algo, triangulate
+from myslam_ref.viz import draw_pointcloud_3d, draw_quality_histogram  # noqa: F401
 
 # %%
 # KITTI 05 @ 0.5× downsample (verify_triangulation.ts 와 동일).
@@ -112,6 +113,23 @@ for idx in [0, 5]:
 # Non-lost rows continue triangulating normally.
 for idx in [1, 2, 3, 4]:
     assert with_lost[idx, 4] == 1.0
+
+# %% [markdown]
+# ## 5. 시각화
+
+# %%
+fig_pc = draw_pointcloud_3d(
+    svd[:, :3],
+    extra_clouds={"ground truth": gt},
+    title="LinearSVD recovered (estimate vs GT)",
+)
+
+# %%
+fig_q = draw_quality_histogram(
+    noisy[:, 3],
+    threshold=0.01,
+    title="4 px epipolar noise · σ4/σ3 distribution",
+)
 
 # %%
 print("OK — step05 triangulation passes 4-case gate (LinearSVD + Midpoint + invert + lost rows)")

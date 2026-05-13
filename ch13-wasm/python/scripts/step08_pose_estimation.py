@@ -30,6 +30,7 @@ import cv2
 import numpy as np
 
 from myslam_ref.pnp import estimate_pose
+from myslam_ref.viz import draw_residual_histogram  # noqa: F401
 
 # %% [markdown]
 # ## 합성 PnP 케이스 생성 (verify_pnp.ts §makeCase 미러)
@@ -168,4 +169,31 @@ for label, opts in [
 
 # %%
 assert all_pass, "step08 PnP gate failed — see above"
+
+# %% [markdown]
+# ## 5. 시각화 — outlier 케이스에서 chi² 분포
+
+# %%
+import matplotlib.pyplot as plt
+
+d_viz = make_case(20, 100, 1.0, outlier_fraction=0.2, outlier_shift=60)
+res_viz = estimate_pose(d_viz["pts3"], d_viz["pts2"], d_viz["K"], d_viz["init_pose6"], rounds=4, iter_per_round=10, chi2_threshold=5.991)
+proj, _ = cv2.projectPoints(d_viz["pts3"], cv2.Rodrigues(res_viz.T_cw[:, :3])[0], res_viz.T_cw[:, 3], d_viz["K"], None)
+residuals_sq = np.sum((d_viz["pts2"] - proj.reshape(-1, 2)) ** 2, axis=1)
+fig_r = draw_residual_histogram(
+    residuals_sq,
+    chi2_threshold=5.991,
+    title=f"seed=20, 20% outliers · final chi² (n_inlier={res_viz.total_inliers}/{res_viz.N})",
+)
+
+# %%
+# 4 round inlier count 추세 — 라운드별로 inlier 가 어떻게 변하는지.
+fig_ic, ax_ic = plt.subplots(figsize=(7, 3))
+ax_ic.bar(range(1, len(res_viz.round_inlier_count) + 1), res_viz.round_inlier_count, color="steelblue")
+ax_ic.set_xlabel("round")
+ax_ic.set_ylabel("inlier count")
+ax_ic.set_title(f"4-round outlier loop · seeded outliers {len(d_viz['outlier_idx'])}, recall {sum(1 for i in d_viz['outlier_idx'] if res_viz.final_inlier_mask[i] == 0)}")
+fig_ic.tight_layout()
+
+# %%
 print("OK — step08 PnP 4-round outlier loop matches verify_pnp.ts gate")

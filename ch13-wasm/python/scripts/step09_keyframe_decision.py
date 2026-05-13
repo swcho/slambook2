@@ -26,6 +26,7 @@ import numpy as np
 
 from myslam_ref.keyframe import decide_fixed_interval, decide_frame_distance, decide_inlier_threshold
 from myslam_ref.se3 import se3_from_translation
+from myslam_ref.viz import draw_keyframe_timeline  # noqa: F401
 
 # %% [markdown]
 # ## 합성 시퀀스
@@ -80,6 +81,14 @@ for i in frames:
         last_kf_frame = i
 print("fixed_interval inserts at frames:", [i for i, b in enumerate(inserts_p3) if b])
 assert inserts_p3 == [False] * 5 + [True] + [False] * 4
+
+# %% [markdown]
+# ## 4. 시각화 — 정책별 KF 삽입 타임라인
+
+# %%
+fig1 = draw_keyframe_timeline(frames, inserts_p1, metric=inlier_counts, title="policy 1 · inlier threshold (< 80)")
+fig2 = draw_keyframe_timeline(frames, inserts_p2, title="policy 2 · frame distance (≥ 0.5 m)")
+fig3 = draw_keyframe_timeline(frames, inserts_p3, title="policy 3 · fixed interval (≥ 5 frames)")
 
 # %%
 print("OK — step09 keyframe decision policies fire on the expected frames")

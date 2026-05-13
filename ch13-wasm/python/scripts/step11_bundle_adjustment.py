@@ -30,6 +30,7 @@ import cv2
 import numpy as np
 
 from myslam_ref.ba import optimize
+from myslam_ref.viz import draw_chi2_per_edge, draw_pointcloud_3d  # noqa: F401
 
 # %% [markdown]
 # ## 합성 BA 장면 생성 (verify_ba.ts §makeScene 미러)
@@ -204,4 +205,27 @@ all_pass &= ok
 
 # %%
 assert all_pass, "step11 BA gate failed — see above"
+
+# %% [markdown]
+# ## 5. 시각화 — 1 px noise 케이스의 chi² 분포 (initial vs final) + landmark 정합
+
+# %%
+sc_viz = make_scene(10, 4, 40, 1.0)
+res_viz = optimize(sc_viz["init_poses"], sc_viz["init_lms"], sc_viz["observations"],
+                   np.array([0]), sc_viz["K"], IDENTITY_EXT, IDENTITY_EXT,
+                   iterations=20, chi2_init=5.991, adaptive_rounds=5, use_robust_kernel=False)
+fig_chi = draw_chi2_per_edge(
+    res_viz.per_edge_chi2_initial,
+    res_viz.per_edge_chi2_final,
+    title=f"seed=10 · 1 px noise BA · obs={res_viz.O}",
+)
+
+# %%
+fig_lm = draw_pointcloud_3d(
+    res_viz.refined_landmarks3,
+    extra_clouds={"ground truth": sc_viz["landmarks_gt"]},
+    title=f"BA refined landmarks vs GT (max landmark err {float(max(np.linalg.norm(res_viz.refined_landmarks3[l] - sc_viz['landmarks_gt'][l]) for l in range(40))):.3f} m)",
+)
+
+# %%
 print("\nOK — step11 BA: LM + Schur (scipy sparse) + adaptive chi² + stereo ext all match verify_ba.ts")

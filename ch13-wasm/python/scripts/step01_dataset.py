@@ -82,11 +82,13 @@ for frame in ds.frames:
     assert frame.left.shape == frame.right.shape
 
 # %% [markdown]
-# ## 5. 시각화 (노트북 전용 — 스크립트 실행 시 inline display 가 없으면 생략)
+# ## 5. 시각화
+#
+# 노트북에서는 frame 0 stereo pair 가 inline 으로 보이고, 헤드리스 (script/CI) 에서는
+# Agg 백엔드라 figure 만 생성되고 표시는 생략된다.
 
 # %%
-if "ipykernel" in sys.modules or hasattr(sys, "ps1"):
-    draw_frame_pair(ds.frames[0])
+fig = draw_frame_pair(ds.frames[0], title=f"KITTI 05 mini · frame 0 · {ds.frames[0].width}×{ds.frames[0].height}")
 
 # %%
 print("OK — step01 dataset reference matches kitti05-mini")

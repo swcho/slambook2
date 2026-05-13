@@ -119,5 +119,25 @@ expected_v = cam0.fy * pc_pred[1] / pc_pred[2] + cam0.cy
 assert abs(uv_rot[0, 0] - expected_u) < 1e-6, f"expected u={expected_u}, got {uv_rot[0, 0]}"
 assert abs(uv_rot[0, 1] - expected_v) < 1e-6, f"expected v={expected_v}, got {uv_rot[0, 1]}"
 
+# %% [markdown]
+# ## 7. 시각화 — depth 별 stereo disparity 곡선
+#
+# rectified stereo 의 ``disparity = fx · baseline / depth`` 곡선을 KITTI mini 값으로 그린다.
+
+# %%
+import matplotlib.pyplot as plt
+
+depths = np.linspace(2, 60, 60)
+disparities = cam0.fx * cam1.baseline / depths
+fig, ax = plt.subplots(figsize=(7, 3.5))
+ax.plot(depths, disparities, color="steelblue")
+ax.axhline(1.0, color="red", linestyle="--", label="1 px (effective range limit)")
+ax.set_xlabel("depth Z (m)")
+ax.set_ylabel("disparity (px)")
+ax.set_title(f"KITTI 05 mini · fx={cam0.fx:.1f}, baseline={cam1.baseline:.3f} m")
+ax.legend()
+ax.grid(alpha=0.3)
+fig.tight_layout()
+
 # %%
 print("OK — step02 camera reference passes pinhole + baseline + SE(3) checks")

@@ -28,7 +28,7 @@ import numpy as np
 
 from myslam_ref.dataset import load_kitti_mini
 from myslam_ref.features import Detector, detect, render_synth_frame, track_lk
-from myslam_ref.viz import draw_keypoints  # noqa: F401  (notebook use)
+from myslam_ref.viz import draw_detectors_grid, draw_flow_field, draw_mask_overlay  # noqa: F401
 
 # %% [markdown]
 # ## 1. OpenCV 버전 확인 (WASM 빌드는 4.13)
@@ -148,6 +148,25 @@ real_left0 = ds.frames[0].left
 pts_real = detect(real_left0, Detector.GFTT, maxFeatures=200, qualityLevel=0.01, minDistance=20)
 print(f"GFTT on kitti05-mini frame 0 left → {pts_real.shape[0]} kps")
 assert pts_real.shape[0] >= 50, f"expected ≥ 50 GFTT kps on real frame, got {pts_real.shape[0]}"
+
+# %% [markdown]
+# ## 8. 시각화 — 4 detector overlay + mask hole + stereo LK flow
+
+# %%
+detector_results = {}
+for name, algo in detectors:
+    detector_results[name] = detect(frame0, algo, **opts)
+fig_d = draw_detectors_grid(frame0, detector_results)
+
+# %%
+fig_m = draw_mask_overlay(frame0, mask, title="GFTT mask hole (100×100 around marker)")
+
+# %%
+fig_f = draw_flow_field(
+    left0, seeds[:, :2], tracked[:, :2], status=tracked[:, 2],
+    title="stereo LK: left → right flow (rectified pair, dx ≈ -22)",
+    step=2,
+)
 
 # %%
 print("OK — step03 feature detection reference passes 4-detector + mask + LK gate")

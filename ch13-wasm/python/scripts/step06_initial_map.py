@@ -32,6 +32,7 @@ import numpy as np
 from myslam_ref.dataset import load_kitti_mini
 from myslam_ref.features import Detector, detect, track_lk
 from myslam_ref.triangulation import Algo, triangulate
+from myslam_ref.viz import draw_keypoints, draw_pointcloud_3d  # noqa: F401
 
 # %%
 ds = load_kitti_mini()
@@ -81,6 +82,21 @@ depths = accepted[:, 2]
 print(f"accepted depth range: {depths.min():.1f} m ~ {depths.max():.1f} m, median {np.median(depths):.1f} m")
 assert depths.min() > 0
 assert np.median(depths) < 100, "median depth surprisingly large"
+
+# %% [markdown]
+# ## 4. 시각화 — left frame 의 seed overlay + 초기 landmark cloud
+
+# %%
+import matplotlib.pyplot as plt
+
+fig_kp, ax_kp = plt.subplots(figsize=(12, 4))
+draw_keypoints(left, seeds, ax=ax_kp, title=f"GFTT seeds on KITTI mini frame 0 left ({seeds.shape[0]} kps)")
+
+# %%
+fig_pc = draw_pointcloud_3d(
+    accepted[:, :3],
+    title=f"Initial landmark cloud ({accepted.shape[0]} points) — KITTI mini frame 0",
+)
 
 # %%
 print(f"OK — step06 initial map: {accepted.shape[0]} landmarks from KITTI mini frame 0")

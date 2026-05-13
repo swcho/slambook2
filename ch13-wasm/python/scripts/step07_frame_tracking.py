@@ -27,6 +27,7 @@ import numpy as np
 
 from myslam_ref.dataset import load_kitti_mini
 from myslam_ref.features import Detector, detect, track_lk
+from myslam_ref.viz import draw_flow_field  # noqa: F401
 
 # %%
 ds = load_kitti_mini()
@@ -64,6 +65,20 @@ for i, (rate, dx, dy) in enumerate(results):
     # Forward motion 이지만 KITTI mini 1226×370 에서 픽셀 단위 dx 는 보통 -50 ~ +50 px.
     assert abs(dx) < 100, f"pair {i}→{i + 1}: |dx|={abs(dx):.1f} surprisingly large"
     assert abs(dy) < 30, f"pair {i}→{i + 1}: |dy|={abs(dy):.1f} surprisingly large"
+
+# %% [markdown]
+# ## 3. 시각화 — frame 0→1 temporal flow
+
+# %%
+prev0 = ds.frames[0].left
+curr1 = ds.frames[1].left
+seeds0 = detect(prev0, Detector.GFTT, maxFeatures=200, qualityLevel=0.01, minDistance=20)
+tracked01 = track_lk(prev0, curr1, seeds0)
+fig_flow = draw_flow_field(
+    prev0, seeds0[:, :2], tracked01[:, :2], status=tracked01[:, 2],
+    title=f"KITTI mini · temporal LK frame 0 → 1 (rate {(tracked01[:, 2] > 0.5).mean() * 100:.0f}%)",
+    step=2,
+)
 
 # %%
 print(f"OK — step07 temporal LK tracks {len(results)} consecutive pairs with rate ≥ 70 %")

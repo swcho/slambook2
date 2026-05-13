@@ -31,6 +31,7 @@ import numpy as np
 
 from myslam_ref.dataset import load_kitti_mini
 from myslam_ref.features import Detector, detect, track_lk
+from myslam_ref.viz import draw_flow_field  # noqa: F401
 
 # %%
 ds = load_kitti_mini()
@@ -80,6 +81,28 @@ tracked_init = track_lk(
 ok_i = tracked_init[:, 2] > 0.5
 print(f"with init guess (expected disparity ≈ {expected_disparity:.1f} px): tracked {int(ok_i.sum())}/{n}")
 assert int(ok_i.sum()) >= n_ok - 2  # tolerate ±2 jitter
+
+# %% [markdown]
+# ## 3. 시각화 — KITTI mini frame 0 의 stereo disparity flow
+
+# %%
+import matplotlib.pyplot as plt
+
+fig_flow = draw_flow_field(
+    left, seeds[:, :2], tracked[:, :2], status=tracked[:, 2],
+    title=f"KITTI mini frame 0: left → right LK ({n_ok}/{n} tracked, mean dx={dxs.mean():+.1f} px)",
+    step=2,
+)
+
+# %%
+# Disparity 분포 — depth 로 변환하면 ``Z = fx · baseline / disparity``.
+fig_d, ax_d = plt.subplots(figsize=(8, 3))
+disp = -dxs  # left → right shift 의 절댓값
+ax_d.hist(disp, bins=30, color="steelblue", alpha=0.8)
+ax_d.set_xlabel("disparity (px)")
+ax_d.set_ylabel("count")
+ax_d.set_title(f"KITTI mini frame 0 stereo disparity (median {float(np.median(disp)):.1f} px → ~{cam.fx * ds.camera1.baseline_m / float(np.median(disp)):.1f} m depth)")
+fig_d.tight_layout()
 
 # %%
 print("OK — step04 stereo matching: rectified-pair LK has near-zero dy and negative dx")
