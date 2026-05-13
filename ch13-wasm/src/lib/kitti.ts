@@ -1,10 +1,18 @@
-// KITTI odometry dataset parser + image loader for the browser.
+// KITTI dataset parser + image loader for the browser.
 //
 // Mirrors ch13/src/dataset.cpp: each P_i (3x4) row in calib.txt is split into
 // intrinsic K (3x3) and a translation t = K^{-1} * P[:,3]. The book downsamples
 // the image by 0.5 at load time and scales K to match; `parseKittiCalib`
 // accepts the same factor. Baseline is |t| (P0 has t=0, P1 encodes the
 // left↔right offset).
+//
+// Two calib formats are supported:
+//   - odometry (`calib.txt`):       `P0..P3: <12 numbers>`
+//   - raw     (`calib_cam_to_cam.txt`): `P_rect_0[0-3]: <12 numbers>` rows are
+//                                  the post-rectification projections used
+//                                  for the image_0X streams.
+
+import type { DatasetDef } from './datasets';
 
 export interface KittiCamera {
   id: number;
@@ -55,6 +63,48 @@ export function parseKittiCalib(text: string, downsample = 0.5): KittiCamera[] {
     throw new Error('calib.txt contained no P<k> rows');
   }
   return cameras.sort((a, b) => a.id - b.id);
+}
+
+/**
+ * Parse a KITTI-raw `calib_cam_to_cam.txt`.
+ * Pulls the `P_rect_0X: <12 numbers>` lines (X = 0..3) — these are the
+ * projection matrices applied to the rectified image_0X streams that the
+ * raw drive ships. Other rows (S_, K_, D_, R_, T_, R_rect_) are ignored.
+ */
+export function parseKittiRawCalib(text: string, downsample = 0.5): KittiCamera[] {
+  const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
+  const cameras: KittiCamera[] = [];
+  for (const line of lines) {
+    const match = line.match(/^P_rect_0(\d):\s*(.+)$/);
+    if (!match) continue;
+    const id = Number.parseInt(match[1], 10);
+    const nums = match[2].split(/\s+/).map(Number);
+    if (nums.length !== 12 || nums.some((n) => !Number.isFinite(n))) {
+      throw new Error(`calib_cam_to_cam.txt: malformed P_rect_0${id}: ${line}`);
+    }
+    cameras.push(buildCamera(id, nums, downsample));
+  }
+  if (cameras.length === 0) {
+    throw new Error('calib_cam_to_cam.txt contained no P_rect_0<k> rows');
+  }
+  return cameras.sort((a, b) => a.id - b.id);
+}
+
+/**
+ * Fetch and parse calibration for the active dataset, dispatching to the
+ * odometry/raw parser based on `dataset.calibFormat`.
+ */
+export async function loadKittiCalibFor(
+  dataset: DatasetDef,
+  downsample = 0.5,
+): Promise<KittiCamera[]> {
+  const url = `${dataset.dir}/${dataset.calibFile}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`${dataset.calibFile}: HTTP ${res.status} at ${url}`);
+  const text = await res.text();
+  return dataset.calibFormat === 'raw'
+    ? parseKittiRawCalib(text, downsample)
+    : parseKittiCalib(text, downsample);
 }
 
 function buildCamera(id: number, p: number[], downsample: number): KittiCamera {

@@ -3,7 +3,8 @@ import { useQuery } from '@tanstack/react-query';
 import { STEPS } from '../index';
 import { StepLayout } from '../../components/StepLayout';
 import type { VerifyItem } from '../../components/VerifyGate';
-import { loadKittiFrame, parseKittiCalib, type KittiCamera, type StereoFrame } from '../../lib/kitti';
+import { loadKittiCalibFor, loadKittiFrame, type KittiCamera, type StereoFrame } from '../../lib/kitti';
+import { useDataset } from '../../lib/useDataset';
 import {
   imageDataToGray,
   loadFeaturesWasm,
@@ -29,8 +30,6 @@ import {
 // → temporal LK → PnP) for every i → i+1 transition in the mini fixture, then
 // apply each policy on the resulting tracking_inliers + relative motion.
 
-const DATASET_DIR = '/datasets/kitti05-mini';
-const FRAME_COUNT = 5;
 // ch13/include/myslam/frontend.h::num_features_needed_for_keyframe default = 80.
 const KF_INLIER_THRESHOLD_DEFAULT = 80;
 
@@ -78,23 +77,21 @@ interface Decision {
 
 export function Step09KeyframeDecision() {
   const step = STEPS.find((s) => s.id === 9)!;
+  const { dataset } = useDataset();
+  const numFrames = Math.min(dataset.analysisFrames, dataset.frameCount);
   const [params, setParams] = useState<Step9Params>(DEFAULT_PARAMS);
 
   const downsample = 0.5;
   const cameras = useQuery({
-    queryKey: ['kitti', 'calib', DATASET_DIR, downsample],
-    queryFn: async () => {
-      const res = await fetch(`${DATASET_DIR}/calib.txt`);
-      if (!res.ok) throw new Error(`calib.txt: HTTP ${res.status}`);
-      return parseKittiCalib(await res.text(), downsample);
-    },
+    queryKey: ['kitti', 'calib', dataset.id, downsample],
+    queryFn: () => loadKittiCalibFor(dataset, downsample),
   });
   const frames = useQuery({
-    queryKey: ['kitti', 'all-frames', DATASET_DIR, downsample],
+    queryKey: ['kitti', 'all-frames', dataset.id, downsample, numFrames],
     queryFn: async () => {
       const out: StereoFrame[] = [];
-      for (let i = 0; i < FRAME_COUNT; i++) {
-        out.push(await loadKittiFrame(DATASET_DIR, i, downsample));
+      for (let i = 0; i < numFrames; i++) {
+        out.push(await loadKittiFrame(dataset.dir, i, downsample));
       }
       return out;
     },
@@ -161,16 +158,16 @@ export function Step09KeyframeDecision() {
     });
     items.push({
       id: 'frames-loaded',
-      label: `${FRAME_COUNT} frames + calib 로드`,
-      pass: !!frames.data && frames.data.length === FRAME_COUNT && !!cameras.data,
+      label: `${numFrames} frames + calib 로드`,
+      pass: !!frames.data && frames.data.length === numFrames && !!cameras.data,
       detail: frames.data ? `${frames.data.length} frames` : undefined,
     });
     if (transitions) {
       items.push({
         id: 'pnp-all',
-        label: `모든 ${FRAME_COUNT - 1}개 transition에서 PnP 수렴`,
-        pass: transitions.length === FRAME_COUNT - 1,
-        detail: `${transitions.length} / ${FRAME_COUNT - 1} transitions`,
+        label: `모든 ${numFrames - 1}개 transition에서 PnP 수렴`,
+        pass: transitions.length === numFrames - 1,
+        detail: `${transitions.length} / ${numFrames - 1} transitions`,
       });
     } else {
       items.push({ id: 'pnp-all', label: 'PnP 수렴', pass: false, detail: '계산 대기' });

@@ -3,7 +3,8 @@ import { useQuery } from '@tanstack/react-query';
 import { STEPS } from '../index';
 import { StepLayout } from '../../components/StepLayout';
 import type { VerifyItem } from '../../components/VerifyGate';
-import { loadKittiFrame, parseKittiCalib } from '../../lib/kitti';
+import { loadKittiCalibFor, loadKittiFrame } from '../../lib/kitti';
+import { useDataset } from '../../lib/useDataset';
 import {
   imageDataToGray,
   loadFeaturesWasm,
@@ -11,8 +12,6 @@ import {
   type FeaturesModule,
 } from '../../wasm/features';
 
-const DATASET_DIR = '/datasets/kitti05-mini';
-const FRAME_COUNT = 5;
 const DETECTORS: DetectorKey[] = ['GFTT', 'Harris', 'FAST', 'ORB'];
 
 interface DetectParams {
@@ -53,23 +52,22 @@ function gridCoverage(kps: Float64Array, w: number, h: number, gx = 4, gy = 4): 
 
 export function Step03FeatureDetection() {
   const step = STEPS.find((s) => s.id === 3)!;
+  const { dataset } = useDataset();
+  const frameCount = dataset.frameCount;
   const [frameIndex, setFrameIndex] = useState(0);
+  const clampedFrame = Math.min(frameIndex, frameCount - 1);
   const [params, setParams] = useState<DetectParams>(DEFAULT_PARAMS);
 
   // We always load at the same downsample as Step 1's default (0.5×) so
   // pipeline stages stay consistent.
   const downsample = 0.5;
   const cameras = useQuery({
-    queryKey: ['kitti', 'calib', DATASET_DIR, downsample],
-    queryFn: async () => {
-      const res = await fetch(`${DATASET_DIR}/calib.txt`);
-      if (!res.ok) throw new Error(`calib.txt: HTTP ${res.status}`);
-      return parseKittiCalib(await res.text(), downsample);
-    },
+    queryKey: ['kitti', 'calib', dataset.id, downsample],
+    queryFn: () => loadKittiCalibFor(dataset, downsample),
   });
   const frame = useQuery({
-    queryKey: ['kitti', 'frame', DATASET_DIR, frameIndex, downsample],
-    queryFn: () => loadKittiFrame(DATASET_DIR, frameIndex, downsample),
+    queryKey: ['kitti', 'frame', dataset.id, clampedFrame, downsample],
+    queryFn: () => loadKittiFrame(dataset.dir, clampedFrame, downsample),
   });
   const wasm = useQuery<FeaturesModule>({
     queryKey: ['wasm', 'features', 'baseline'],
@@ -152,8 +150,9 @@ export function Step03FeatureDetection() {
       step={step}
       paramPanel={
         <ParamPanel
-          frameIndex={frameIndex}
+          frameIndex={clampedFrame}
           setFrameIndex={setFrameIndex}
+          frameCount={frameCount}
           params={params}
           setParams={setParams}
         />
@@ -186,11 +185,13 @@ export function Step03FeatureDetection() {
 function ParamPanel({
   frameIndex,
   setFrameIndex,
+  frameCount,
   params,
   setParams,
 }: {
   frameIndex: number;
   setFrameIndex: (n: number) => void;
+  frameCount: number;
   params: DetectParams;
   setParams: (next: DetectParams) => void;
 }) {
@@ -238,7 +239,7 @@ function ParamPanel({
         label="frame"
         value={frameIndex}
         min={0}
-        max={FRAME_COUNT - 1}
+        max={Math.max(0, frameCount - 1)}
         step={1}
         onChange={setFrameIndex}
         format={(n) => String(n)}

@@ -4,7 +4,8 @@ import { STEPS } from '../index';
 import { StepLayout } from '../../components/StepLayout';
 import type { VerifyItem } from '../../components/VerifyGate';
 import { Scene3D, type CameraFrustum, type PointCloudInput } from '../../components/Scene3D';
-import { loadKittiFrame, parseKittiCalib, type KittiCamera } from '../../lib/kitti';
+import { loadKittiCalibFor, loadKittiFrame, type KittiCamera } from '../../lib/kitti';
+import { useDataset } from '../../lib/useDataset';
 import { imageDataToGray, loadFeaturesWasm, type FeaturesModule } from '../../wasm/features';
 import {
   loadTriangulationWasm,
@@ -12,9 +13,6 @@ import {
   makeRectifiedT,
   type TriangulationModule,
 } from '../../wasm/triangulation';
-
-const DATASET_DIR = '/datasets/kitti05-mini';
-const FRAME_COUNT = 5;
 
 interface Step6Params {
   numFeaturesInit: number; // ch13's num_features_init = 50
@@ -44,21 +42,20 @@ interface InitMapResult {
 
 export function Step06InitialMap() {
   const step = STEPS.find((s) => s.id === 6)!;
+  const { dataset } = useDataset();
+  const frameCount = dataset.frameCount;
   const [frameIndex, setFrameIndex] = useState(0);
+  const clampedFrame = Math.min(frameIndex, frameCount - 1);
   const [params, setParams] = useState<Step6Params>(DEFAULT_PARAMS);
 
   const downsample = 0.5;
   const cameras = useQuery({
-    queryKey: ['kitti', 'calib', DATASET_DIR, downsample],
-    queryFn: async () => {
-      const res = await fetch(`${DATASET_DIR}/calib.txt`);
-      if (!res.ok) throw new Error(`calib.txt: HTTP ${res.status}`);
-      return parseKittiCalib(await res.text(), downsample);
-    },
+    queryKey: ['kitti', 'calib', dataset.id, downsample],
+    queryFn: () => loadKittiCalibFor(dataset, downsample),
   });
   const frame = useQuery({
-    queryKey: ['kitti', 'frame', DATASET_DIR, frameIndex, downsample],
-    queryFn: () => loadKittiFrame(DATASET_DIR, frameIndex, downsample),
+    queryKey: ['kitti', 'frame', dataset.id, clampedFrame, downsample],
+    queryFn: () => loadKittiFrame(dataset.dir, clampedFrame, downsample),
   });
   const features = useQuery<FeaturesModule>({
     queryKey: ['wasm', 'features', 'baseline'],
@@ -229,8 +226,9 @@ export function Step06InitialMap() {
       step={step}
       paramPanel={
         <ParamPanel
-          frameIndex={frameIndex}
+          frameIndex={clampedFrame}
           setFrameIndex={setFrameIndex}
+          frameCount={frameCount}
           params={params}
           setParams={setParams}
         />
@@ -260,11 +258,13 @@ export function Step06InitialMap() {
 function ParamPanel({
   frameIndex,
   setFrameIndex,
+  frameCount,
   params,
   setParams,
 }: {
   frameIndex: number;
   setFrameIndex: (n: number) => void;
+  frameCount: number;
   params: Step6Params;
   setParams: (next: Step6Params) => void;
 }) {
@@ -283,7 +283,7 @@ function ParamPanel({
       }}
     >
       <h3 style={sectionTitle}>BuildInitMap</h3>
-      <Slider label="frame" value={frameIndex} min={0} max={FRAME_COUNT - 1} step={1} onChange={setFrameIndex} format={(n) => String(n)} />
+      <Slider label="frame" value={frameIndex} min={0} max={Math.max(0, frameCount - 1)} step={1} onChange={setFrameIndex} format={(n) => String(n)} />
       <Slider label="num_features (GFTT seed)" value={params.maxFeatures} min={50} max={500} step={10} onChange={(n) => update('maxFeatures', n)} format={(n) => String(n)} />
       <Slider label="num_features_init (gate)" value={params.numFeaturesInit} min={10} max={200} step={5} onChange={(n) => update('numFeaturesInit', n)} format={(n) => String(n)} />
       <Slider label="quality threshold (σ4/σ3)" value={params.qualityThreshold} min={1e-4} max={0.5} step={1e-4} onChange={(n) => update('qualityThreshold', n)} format={(n) => n.toExponential(1)} />

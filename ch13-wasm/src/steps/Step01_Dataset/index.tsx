@@ -5,42 +5,40 @@ import { StepLayout } from '../../components/StepLayout';
 import type { VerifyItem } from '../../components/VerifyGate';
 import {
   formatMatrix3,
+  loadKittiCalibFor,
   loadKittiFrame,
-  parseKittiCalib,
   type KittiCamera,
   type StereoFrame,
 } from '../../lib/kitti';
+import { useDataset } from '../../lib/useDataset';
+import type { DatasetDef } from '../../lib/datasets';
 
-const DATASET_DIR = '/datasets/kitti05-mini';
-const FRAME_COUNT = 5;
 const DOWNSAMPLE_OPTIONS = [0.25, 0.5, 1.0] as const;
 
-function useCameras(downsample: number) {
+function useCameras(dataset: DatasetDef, downsample: number) {
   return useQuery({
-    queryKey: ['kitti', 'calib', DATASET_DIR, downsample],
-    queryFn: async () => {
-      const res = await fetch(`${DATASET_DIR}/calib.txt`);
-      if (!res.ok) throw new Error(`calib.txt: HTTP ${res.status}`);
-      const text = await res.text();
-      return parseKittiCalib(text, downsample);
-    },
+    queryKey: ['kitti', 'calib', dataset.id, downsample],
+    queryFn: () => loadKittiCalibFor(dataset, downsample),
   });
 }
 
-function useFrame(index: number, downsample: number) {
+function useFrame(dataset: DatasetDef, index: number, downsample: number) {
   return useQuery({
-    queryKey: ['kitti', 'frame', DATASET_DIR, index, downsample],
-    queryFn: () => loadKittiFrame(DATASET_DIR, index, downsample),
+    queryKey: ['kitti', 'frame', dataset.id, index, downsample],
+    queryFn: () => loadKittiFrame(dataset.dir, index, downsample),
   });
 }
 
 export function Step01Dataset() {
   const step = STEPS.find((s) => s.id === 1)!;
+  const { dataset } = useDataset();
+  const frameCount = dataset.frameCount;
   const [frameIndex, setFrameIndex] = useState(0);
   const [downsample, setDownsample] = useState<(typeof DOWNSAMPLE_OPTIONS)[number]>(0.5);
 
-  const cameras = useCameras(downsample);
-  const frame = useFrame(frameIndex, downsample);
+  const clampedIndex = Math.min(frameIndex, frameCount - 1);
+  const cameras = useCameras(dataset, downsample);
+  const frame = useFrame(dataset, clampedIndex, downsample);
 
   const verifyItems: VerifyItem[] = useMemo(() => {
     const cams = cameras.data ?? null;
@@ -70,7 +68,7 @@ export function Step01Dataset() {
       label: '좌/우 해상도 일치',
       pass: !!fr && fr.left.width === fr.right.width && fr.left.height === fr.right.height,
     });
-    const expectedFx = 7.070912e2 * downsample;
+    const expectedFx = p1 ? p1.P[0] * downsample : 0;
     items.push({
       id: 'downsample-applied',
       label: 'K 행렬에 downsample 계수 적용',
@@ -85,10 +83,12 @@ export function Step01Dataset() {
       step={step}
       paramPanel={
         <ParamPanel
-          frameIndex={frameIndex}
+          frameIndex={clampedIndex}
           setFrameIndex={setFrameIndex}
+          frameCount={frameCount}
           downsample={downsample}
           setDownsample={setDownsample}
+          datasetDir={dataset.dir}
         />
       }
       input={
@@ -114,13 +114,17 @@ export function Step01Dataset() {
 function ParamPanel({
   frameIndex,
   setFrameIndex,
+  frameCount,
   downsample,
   setDownsample,
+  datasetDir,
 }: {
   frameIndex: number;
   setFrameIndex: (n: number) => void;
+  frameCount: number;
   downsample: (typeof DOWNSAMPLE_OPTIONS)[number];
   setDownsample: (n: (typeof DOWNSAMPLE_OPTIONS)[number]) => void;
+  datasetDir: string;
 }) {
   return (
     <section
@@ -137,12 +141,12 @@ function ParamPanel({
       <h3 style={sectionTitle}>Parameters</h3>
       <label style={labelStyle}>
         <span>
-          start frame: <strong>{frameIndex}</strong> / {FRAME_COUNT - 1}
+          start frame: <strong>{frameIndex}</strong> / {Math.max(0, frameCount - 1)}
         </span>
         <input
           type="range"
           min={0}
-          max={FRAME_COUNT - 1}
+          max={Math.max(0, frameCount - 1)}
           step={1}
           value={frameIndex}
           onChange={(e) => setFrameIndex(Number(e.target.value))}
@@ -173,7 +177,7 @@ function ParamPanel({
       </div>
       <div style={{ fontSize: 12, color: '#888', lineHeight: 1.6 }}>
         <div>
-          dataset: <code>{DATASET_DIR}</code>
+          dataset: <code>{datasetDir}</code>
         </div>
         <div>ch13/src/dataset.cpp는 고정 0.5× 적용. 학습 목적으로 가변 허용.</div>
       </div>

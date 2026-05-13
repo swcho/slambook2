@@ -3,7 +3,8 @@ import { useQuery } from '@tanstack/react-query';
 import { STEPS } from '../index';
 import { StepLayout } from '../../components/StepLayout';
 import type { VerifyItem } from '../../components/VerifyGate';
-import { loadKittiFrame, parseKittiCalib } from '../../lib/kitti';
+import { loadKittiCalibFor, loadKittiFrame } from '../../lib/kitti';
+import { useDataset } from '../../lib/useDataset';
 import {
   imageDataToGray,
   loadFeaturesWasm,
@@ -19,8 +20,6 @@ import {
 // expose the two reachable strategies plus a velocity-prior toggle that lets
 // learners observe how a temporal prior changes LK convergence.
 
-const DATASET_DIR = '/datasets/kitti05-mini';
-const FRAME_COUNT = 5;
 const DETECTORS: DetectorKey[] = ['GFTT', 'Harris', 'FAST', 'ORB'];
 const ITER_SWEEP = [1, 2, 3, 5, 8, 12, 20, 30] as const;
 
@@ -78,26 +77,25 @@ interface IterSweepRow {
 
 export function Step07FrameTracking() {
   const step = STEPS.find((s) => s.id === 7)!;
+  const { dataset } = useDataset();
+  const frameCount = dataset.frameCount;
   const [currIndex, setCurrIndex] = useState(1);
+  const clampedCurr = Math.min(Math.max(1, currIndex), frameCount - 1);
   const [params, setParams] = useState<Step7Params>(DEFAULT_PARAMS);
 
   const downsample = 0.5;
   const cameras = useQuery({
-    queryKey: ['kitti', 'calib', DATASET_DIR, downsample],
-    queryFn: async () => {
-      const res = await fetch(`${DATASET_DIR}/calib.txt`);
-      if (!res.ok) throw new Error(`calib.txt: HTTP ${res.status}`);
-      return parseKittiCalib(await res.text(), downsample);
-    },
+    queryKey: ['kitti', 'calib', dataset.id, downsample],
+    queryFn: () => loadKittiCalibFor(dataset, downsample),
   });
   const prevFrame = useQuery({
-    queryKey: ['kitti', 'frame', DATASET_DIR, currIndex - 1, downsample],
-    queryFn: () => loadKittiFrame(DATASET_DIR, currIndex - 1, downsample),
-    enabled: currIndex >= 1,
+    queryKey: ['kitti', 'frame', dataset.id, clampedCurr - 1, downsample],
+    queryFn: () => loadKittiFrame(dataset.dir, clampedCurr - 1, downsample),
+    enabled: clampedCurr >= 1,
   });
   const currFrame = useQuery({
-    queryKey: ['kitti', 'frame', DATASET_DIR, currIndex, downsample],
-    queryFn: () => loadKittiFrame(DATASET_DIR, currIndex, downsample),
+    queryKey: ['kitti', 'frame', dataset.id, clampedCurr, downsample],
+    queryFn: () => loadKittiFrame(dataset.dir, clampedCurr, downsample),
   });
   const wasm = useQuery<FeaturesModule>({
     queryKey: ['wasm', 'features', 'baseline'],
@@ -315,8 +313,9 @@ export function Step07FrameTracking() {
       step={step}
       paramPanel={
         <ParamPanel
-          currIndex={currIndex}
+          currIndex={clampedCurr}
           setCurrIndex={setCurrIndex}
+          frameCount={frameCount}
           params={params}
           setParams={setParams}
         />
@@ -362,11 +361,13 @@ function countTracked(out: Float64Array, total: number): number {
 function ParamPanel({
   currIndex,
   setCurrIndex,
+  frameCount,
   params,
   setParams,
 }: {
   currIndex: number;
   setCurrIndex: (n: number) => void;
+  frameCount: number;
   params: Step7Params;
   setParams: (next: Step7Params) => void;
 }) {
@@ -405,7 +406,7 @@ function ParamPanel({
           </button>
         ))}
       </div>
-      <Slider label="curr frame" value={currIndex} min={1} max={FRAME_COUNT - 1} step={1} onChange={setCurrIndex} format={(n) => `#${n - 1} → #${n}`} />
+      <Slider label="curr frame" value={currIndex} min={1} max={Math.max(1, frameCount - 1)} step={1} onChange={setCurrIndex} format={(n) => `#${n - 1} → #${n}`} />
       <Slider label="maxFeatures" value={params.maxFeatures} min={20} max={500} step={10} onChange={(n) => update('maxFeatures', n)} format={(n) => String(n)} />
 
       <h3 style={sectionTitle}>Init strategy</h3>

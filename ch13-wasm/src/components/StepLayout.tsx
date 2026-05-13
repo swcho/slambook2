@@ -3,6 +3,8 @@ import type { StepMeta } from '../steps';
 import { ParamPanel } from './ParamPanel';
 import { PerfMeter } from './PerfMeter';
 import { VerifyGate, type VerifyItem } from './VerifyGate';
+import { useDataset } from '../lib/useDataset';
+import type { DatasetId } from '../lib/datasets';
 
 export interface StepLayoutProps {
   step: StepMeta;
@@ -28,11 +30,24 @@ export function StepLayout({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <header style={{ borderBottom: '1px solid var(--border-subtle)', paddingBottom: 8 }}>
-        <div style={{ color: 'var(--color-fg-faint)', fontSize: 12 }}>
-          Step {String(step.id).padStart(2, '0')}
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
+            gap: 12,
+            flexWrap: 'wrap',
+          }}
+        >
+          <div>
+            <div style={{ color: 'var(--color-fg-faint)', fontSize: 12 }}>
+              Step {String(step.id).padStart(2, '0')}
+            </div>
+            <h1 style={{ margin: '4px 0' }}>{step.title}</h1>
+            <div style={{ color: 'var(--color-fg-muted)' }}>{step.summary}</div>
+          </div>
+          <DatasetSwitcher />
         </div>
-        <h1 style={{ margin: '4px 0' }}>{step.title}</h1>
-        <div style={{ color: 'var(--color-fg-muted)' }}>{step.summary}</div>
       </header>
 
       <div className="step-grid">
@@ -75,3 +90,40 @@ const h3Style: React.CSSProperties = {
 };
 
 const placeholderStyle: React.CSSProperties = { color: 'var(--color-fg-faint)' };
+
+function DatasetSwitcher() {
+  const { dataset, setDataset, all } = useDataset();
+  return (
+    <label
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 4,
+        fontSize: 11,
+        color: 'var(--color-fg-muted)',
+      }}
+      title={dataset.description ?? dataset.dir}
+    >
+      <span style={{ letterSpacing: 0.5, textTransform: 'uppercase' }}>dataset</span>
+      <select
+        aria-label="active dataset"
+        value={dataset.id}
+        onChange={(e) => setDataset(e.target.value as DatasetId)}
+        style={{
+          background: 'var(--surface-panel)',
+          color: 'var(--color-fg)',
+          border: '1px solid var(--border-subtle)',
+          borderRadius: 4,
+          padding: '4px 6px',
+          fontSize: 12,
+        }}
+      >
+        {all.map((d) => (
+          <option key={d.id} value={d.id}>
+            {d.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}

@@ -3,7 +3,8 @@ import { useQuery } from '@tanstack/react-query';
 import { STEPS } from '../index';
 import { StepLayout } from '../../components/StepLayout';
 import type { VerifyItem } from '../../components/VerifyGate';
-import { loadKittiFrame, parseKittiCalib, type KittiCamera } from '../../lib/kitti';
+import { loadKittiCalibFor, loadKittiFrame, type KittiCamera } from '../../lib/kitti';
+import { useDataset } from '../../lib/useDataset';
 import { imageDataToGray, loadFeaturesWasm, type FeaturesModule } from '../../wasm/features';
 import {
   loadTriangulationWasm,
@@ -13,8 +14,6 @@ import {
   type TriangulationModule,
 } from '../../wasm/triangulation';
 
-const DATASET_DIR = '/datasets/kitti05-mini';
-const FRAME_COUNT = 5;
 const ALGOS: TriangulationAlgo[] = ['LinearSVD', 'Midpoint'];
 
 interface Step5Params {
@@ -47,21 +46,20 @@ interface TriResult {
 
 export function Step05Triangulation() {
   const step = STEPS.find((s) => s.id === 5)!;
+  const { dataset } = useDataset();
+  const frameCount = dataset.frameCount;
   const [frameIndex, setFrameIndex] = useState(0);
+  const clampedFrame = Math.min(frameIndex, frameCount - 1);
   const [params, setParams] = useState<Step5Params>(DEFAULT_PARAMS);
 
   const downsample = 0.5;
   const cameras = useQuery({
-    queryKey: ['kitti', 'calib', DATASET_DIR, downsample],
-    queryFn: async () => {
-      const res = await fetch(`${DATASET_DIR}/calib.txt`);
-      if (!res.ok) throw new Error(`calib.txt: HTTP ${res.status}`);
-      return parseKittiCalib(await res.text(), downsample);
-    },
+    queryKey: ['kitti', 'calib', dataset.id, downsample],
+    queryFn: () => loadKittiCalibFor(dataset, downsample),
   });
   const frame = useQuery({
-    queryKey: ['kitti', 'frame', DATASET_DIR, frameIndex, downsample],
-    queryFn: () => loadKittiFrame(DATASET_DIR, frameIndex, downsample),
+    queryKey: ['kitti', 'frame', dataset.id, clampedFrame, downsample],
+    queryFn: () => loadKittiFrame(dataset.dir, clampedFrame, downsample),
   });
   const features = useQuery<FeaturesModule>({
     queryKey: ['wasm', 'features', 'baseline'],
@@ -208,8 +206,9 @@ export function Step05Triangulation() {
       step={step}
       paramPanel={
         <ParamPanel
-          frameIndex={frameIndex}
+          frameIndex={clampedFrame}
           setFrameIndex={setFrameIndex}
+          frameCount={frameCount}
           params={params}
           setParams={setParams}
         />
@@ -224,11 +223,13 @@ export function Step05Triangulation() {
 function ParamPanel({
   frameIndex,
   setFrameIndex,
+  frameCount,
   params,
   setParams,
 }: {
   frameIndex: number;
   setFrameIndex: (n: number) => void;
+  frameCount: number;
   params: Step5Params;
   setParams: (next: Step5Params) => void;
 }) {
@@ -268,7 +269,7 @@ function ParamPanel({
         ))}
       </div>
 
-      <Slider label="frame" value={frameIndex} min={0} max={FRAME_COUNT - 1} step={1} onChange={setFrameIndex} format={(n) => String(n)} />
+      <Slider label="frame" value={frameIndex} min={0} max={Math.max(0, frameCount - 1)} step={1} onChange={setFrameIndex} format={(n) => String(n)} />
       <Slider label="maxFeatures (GFTT seed)" value={params.maxFeatures} min={20} max={500} step={10} onChange={(n) => update('maxFeatures', n)} format={(n) => String(n)} />
       <Slider
         label={params.algo === 'LinearSVD' ? 'σ4/σ3 threshold' : 'rayDist/depth threshold'}

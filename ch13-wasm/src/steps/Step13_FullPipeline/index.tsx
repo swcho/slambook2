@@ -4,7 +4,8 @@ import { STEPS } from '../index';
 import { StepLayout } from '../../components/StepLayout';
 import type { VerifyItem } from '../../components/VerifyGate';
 import { Scene3D, type CameraFrustum, type PointCloudInput } from '../../components/Scene3D';
-import { loadKittiFrame, parseKittiCalib, type StereoFrame } from '../../lib/kitti';
+import { loadKittiCalibFor, loadKittiFrame, type StereoFrame } from '../../lib/kitti';
+import { useDataset } from '../../lib/useDataset';
 import { loadFeaturesWasm, type FeaturesModule } from '../../wasm/features';
 import { loadTriangulationWasm, type TriangulationModule } from '../../wasm/triangulation';
 import { loadPnPWasm, type PnPModule } from '../../wasm/pnp';
@@ -27,44 +28,36 @@ import { se3Invert } from '../../lib/slam/se3';
 // that we can recompute the whole run synchronously whenever params change.
 // Phase I will move this onto a Web Worker per PLAN §9.
 
-const DATASET_DIR = '/datasets/kitti05-mini';
-const FRAME_COUNT = 5;
-
 type PresetKey = keyof typeof PIPELINE_PRESETS;
 
 interface Step13Params extends PipelineConfig {
   /** Which frame the slider currently shows (0..numFrames-1). */
   playbackFrame: number;
-  /** Total frames the pipeline ran for. ch13 mini = up to FRAME_COUNT. */
-  numFrames: number;
 }
 
 const DEFAULT_PARAMS: Step13Params = {
   ...DEFAULT_PIPELINE,
   windowSize: 5,
-  playbackFrame: FRAME_COUNT - 1,
-  numFrames: FRAME_COUNT,
+  playbackFrame: 0,
 };
 
 export function Step13FullPipeline() {
   const step = STEPS.find((s) => s.id === 13)!;
+  const { dataset } = useDataset();
+  const numFrames = Math.min(dataset.analysisFrames, dataset.frameCount);
   const [params, setParams] = useState<Step13Params>(DEFAULT_PARAMS);
 
   const downsample = 0.5;
   const cameras = useQuery({
-    queryKey: ['kitti', 'calib', DATASET_DIR, downsample],
-    queryFn: async () => {
-      const res = await fetch(`${DATASET_DIR}/calib.txt`);
-      if (!res.ok) throw new Error(`calib.txt: HTTP ${res.status}`);
-      return parseKittiCalib(await res.text(), downsample);
-    },
+    queryKey: ['kitti', 'calib', dataset.id, downsample],
+    queryFn: () => loadKittiCalibFor(dataset, downsample),
   });
   const frames = useQuery({
-    queryKey: ['kitti', 'all-frames', DATASET_DIR, downsample],
+    queryKey: ['kitti', 'all-frames', dataset.id, downsample, numFrames],
     queryFn: async () => {
       const out: StereoFrame[] = [];
-      for (let i = 0; i < FRAME_COUNT; i++) {
-        out.push(await loadKittiFrame(DATASET_DIR, i, downsample));
+      for (let i = 0; i < numFrames; i++) {
+        out.push(await loadKittiFrame(dataset.dir, i, downsample));
       }
       return out;
     },
@@ -128,13 +121,13 @@ export function Step13FullPipeline() {
         { left, right },
         frames.data,
         pipelineConfig,
-        params.numFrames,
+        numFrames,
       );
     } catch (err) {
       console.error('runPipeline failed', err);
       return null;
     }
-  }, [ready, left, right, features.data, tri.data, pnp.data, ba.data, frames.data, pipelineConfig, params.numFrames]);
+  }, [ready, left, right, features.data, tri.data, pnp.data, ba.data, frames.data, pipelineConfig, numFrames]);
 
   const verifyItems: VerifyItem[] = useMemo(() => {
     const items: VerifyItem[] = [];
@@ -145,14 +138,14 @@ export function Step13FullPipeline() {
     });
     items.push({
       id: 'frames-loaded',
-      label: 'KITTI mini fixture (5 frames) + calib 로드',
+      label: `${dataset.label}: ${numFrames} frames + calib 로드`,
       pass: !!frames.data && !!cameras.data,
     });
     if (result) {
       const lostCount = result.records.filter((r) => r.outcome === 'lost' || r.outcome === 'failed').length;
       items.push({
         id: 'all-frames',
-        label: `${params.numFrames} frame 모두 NaN 없이 통과`,
+        label: `${numFrames} frame 모두 NaN 없이 통과`,
         pass: lostCount === 0,
         detail: `lost/failed = ${lostCount}`,
       });
@@ -194,7 +187,7 @@ export function Step13FullPipeline() {
       }
     }
     return items;
-  }, [features.data, tri.data, pnp.data, ba.data, frames.data, cameras.data, result, params.numFrames, params.enableBackend]);
+  }, [features.data, tri.data, pnp.data, ba.data, frames.data, cameras.data, result, numFrames, dataset.label, params.enableBackend]);
 
   // Auto-snap playback to the latest frame whenever a fresh run finishes (so
   // the user sees the final trajectory without scrubbing manually).
@@ -209,7 +202,7 @@ export function Step13FullPipeline() {
     <StepLayout
       step={step}
       paramPanel={<ParamPanel params={params} setParams={setParams} />}
-      input={<InputView records={result?.records ?? []} playbackFrame={params.playbackFrame} setPlaybackFrame={(n) => setParams((p) => ({ ...p, playbackFrame: n }))} numFrames={params.numFrames} />}
+      input={<InputView records={result?.records ?? []} playbackFrame={params.playbackFrame} setPlaybackFrame={(n) => setParams((p) => ({ ...p, playbackFrame: n }))} numFrames={numFrames} />}
       output={<OutputView result={result} playbackFrame={params.playbackFrame} />}
       verifyItems={verifyItems}
     />
@@ -231,7 +224,6 @@ function ParamPanel({
       ...p,
       ...PIPELINE_PRESETS[key],
       playbackFrame: p.playbackFrame,
-      numFrames: p.numFrames,
     }));
   };
 

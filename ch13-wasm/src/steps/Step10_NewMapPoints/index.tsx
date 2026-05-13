@@ -3,7 +3,8 @@ import { useQuery } from '@tanstack/react-query';
 import { STEPS } from '../index';
 import { StepLayout } from '../../components/StepLayout';
 import type { VerifyItem } from '../../components/VerifyGate';
-import { loadKittiFrame, parseKittiCalib, type KittiCamera, type StereoFrame } from '../../lib/kitti';
+import { loadKittiCalibFor, loadKittiFrame, type KittiCamera, type StereoFrame } from '../../lib/kitti';
+import { useDataset } from '../../lib/useDataset';
 import {
   imageDataToGray,
   loadFeaturesWasm,
@@ -23,9 +24,6 @@ import { Scene3D, type CameraFrustum, type PointCloudInput } from '../../compone
 // `cv::rectangle(mask, pt-10..pt+10, 0, FILLED)` — (3) does stereo LK on the
 // new detections, (4) triangulates new MapPoints. PLAN §3 Step 10 exposes the
 // "redetect-only-new vs full-redetect" toggle as the educational comparison.
-
-const DATASET_DIR = '/datasets/kitti05-mini';
-const FRAME_COUNT = 5;
 
 type RedetectMode = 'mask-existing' | 'full-redetect';
 
@@ -73,23 +71,21 @@ interface SequenceRow {
 
 export function Step10NewMapPoints() {
   const step = STEPS.find((s) => s.id === 10)!;
+  const { dataset } = useDataset();
+  const numFrames = Math.min(dataset.analysisFrames, dataset.frameCount);
   const [params, setParams] = useState<Step10Params>(DEFAULT_PARAMS);
 
   const downsample = 0.5;
   const cameras = useQuery({
-    queryKey: ['kitti', 'calib', DATASET_DIR, downsample],
-    queryFn: async () => {
-      const res = await fetch(`${DATASET_DIR}/calib.txt`);
-      if (!res.ok) throw new Error(`calib.txt: HTTP ${res.status}`);
-      return parseKittiCalib(await res.text(), downsample);
-    },
+    queryKey: ['kitti', 'calib', dataset.id, downsample],
+    queryFn: () => loadKittiCalibFor(dataset, downsample),
   });
   const frames = useQuery({
-    queryKey: ['kitti', 'all-frames', DATASET_DIR, downsample],
+    queryKey: ['kitti', 'all-frames', dataset.id, downsample, numFrames],
     queryFn: async () => {
       const out: StereoFrame[] = [];
-      for (let i = 0; i < FRAME_COUNT; i++) {
-        out.push(await loadKittiFrame(DATASET_DIR, i, downsample));
+      for (let i = 0; i < numFrames; i++) {
+        out.push(await loadKittiFrame(dataset.dir, i, downsample));
       }
       return out;
     },
@@ -185,7 +181,7 @@ export function Step10NewMapPoints() {
   return (
     <StepLayout
       step={step}
-      paramPanel={<ParamPanel params={params} setParams={setParams} maxFrame={FRAME_COUNT - 1} />}
+      paramPanel={<ParamPanel params={params} setParams={setParams} maxFrame={Math.max(0, numFrames - 1)} />}
       input={<InputView frames={frames.data ?? null} kfIndex={params.newKeyframe} />}
       output={
         <OutputView

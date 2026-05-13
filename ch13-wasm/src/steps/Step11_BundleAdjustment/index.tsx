@@ -4,7 +4,8 @@ import { STEPS } from '../index';
 import { StepLayout } from '../../components/StepLayout';
 import type { VerifyItem } from '../../components/VerifyGate';
 import { Scene3D, type CameraFrustum, type PointCloudInput } from '../../components/Scene3D';
-import { loadKittiFrame, parseKittiCalib, type StereoFrame } from '../../lib/kitti';
+import { loadKittiCalibFor, loadKittiFrame, type StereoFrame } from '../../lib/kitti';
+import { useDataset } from '../../lib/useDataset';
 import {
   imageDataToGray,
   loadFeaturesWasm,
@@ -48,9 +49,6 @@ import {
 //      stereo LK measurement.
 //   4. Call ba.optimize(). Show chi² + pose drift + per-edge histogram +
 //      3D Scene3D pre/post.
-
-const DATASET_DIR = '/datasets/kitti05-mini';
-const FRAME_COUNT = 5;
 
 interface Step11Params {
   /** Active KFs in the window. 2 = KF0 + KFi, 3 = KF0 + KFi + KFj. */
@@ -118,23 +116,21 @@ interface RunResult {
 
 export function Step11BundleAdjustment() {
   const step = STEPS.find((s) => s.id === 11)!;
+  const { dataset } = useDataset();
+  const numFrames = Math.min(dataset.analysisFrames, dataset.frameCount);
   const [params, setParams] = useState<Step11Params>(DEFAULT_PARAMS);
 
   const downsample = 0.5;
   const cameras = useQuery({
-    queryKey: ['kitti', 'calib', DATASET_DIR, downsample],
-    queryFn: async () => {
-      const res = await fetch(`${DATASET_DIR}/calib.txt`);
-      if (!res.ok) throw new Error(`calib.txt: HTTP ${res.status}`);
-      return parseKittiCalib(await res.text(), downsample);
-    },
+    queryKey: ['kitti', 'calib', dataset.id, downsample],
+    queryFn: () => loadKittiCalibFor(dataset, downsample),
   });
   const frames = useQuery({
-    queryKey: ['kitti', 'all-frames', DATASET_DIR, downsample],
+    queryKey: ['kitti', 'all-frames', dataset.id, downsample, numFrames],
     queryFn: async () => {
       const out: StereoFrame[] = [];
-      for (let i = 0; i < FRAME_COUNT; i++) {
-        out.push(await loadKittiFrame(DATASET_DIR, i, downsample));
+      for (let i = 0; i < numFrames; i++) {
+        out.push(await loadKittiFrame(dataset.dir, i, downsample));
       }
       return out;
     },
@@ -425,7 +421,7 @@ export function Step11BundleAdjustment() {
   return (
     <StepLayout
       step={step}
-      paramPanel={<ParamPanel params={params} setParams={setParams} />}
+      paramPanel={<ParamPanel params={params} setParams={setParams} numFrames={numFrames} />}
       input={<InputView frames={frames.data ?? null} kfIndices={[0, params.kfIndexB, ...(params.windowSize === 3 ? [params.kfIndexC] : [])]} />}
       output={<OutputView result={result} showAfter={params.showAfter} setShowAfter={(v) => setParams({ ...params, showAfter: v })} baseline={right?.t[0] ?? -0.537} />}
       verifyItems={verifyItems}
@@ -434,10 +430,11 @@ export function Step11BundleAdjustment() {
 }
 
 function ParamPanel({
-  params, setParams,
+  params, setParams, numFrames,
 }: {
   params: Step11Params;
   setParams: (next: Step11Params) => void;
+  numFrames: number;
 }) {
   const update = <K extends keyof Step11Params>(key: K, value: Step11Params[K]) =>
     setParams({ ...params, [key]: value });
@@ -456,9 +453,9 @@ function ParamPanel({
           </button>
         ))}
       </div>
-      <Slider label="KF B" value={params.kfIndexB} min={1} max={FRAME_COUNT - 1} step={1} onChange={(n) => update('kfIndexB', n)} format={(n) => `frame #${n}`} />
+      <Slider label="KF B" value={params.kfIndexB} min={1} max={Math.max(1, numFrames - 1)} step={1} onChange={(n) => update('kfIndexB', n)} format={(n) => `frame #${n}`} />
       {params.windowSize === 3 && (
-        <Slider label="KF C" value={params.kfIndexC} min={1} max={FRAME_COUNT - 1} step={1} onChange={(n) => update('kfIndexC', n)} format={(n) => `frame #${n}`} />
+        <Slider label="KF C" value={params.kfIndexC} min={1} max={Math.max(1, numFrames - 1)} step={1} onChange={(n) => update('kfIndexC', n)} format={(n) => `frame #${n}`} />
       )}
       <Slider label="maxFeatures" value={params.maxFeatures} min={50} max={500} step={10} onChange={(n) => update('maxFeatures', n)} format={(n) => String(n)} />
 
