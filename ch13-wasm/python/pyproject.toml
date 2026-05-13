@@ -1,0 +1,40 @@
+[project]
+name = "ch13-wasm-pyref"
+version = "0.1.0"
+description = "Python reference implementations mirroring ch13-wasm's 13-step visual SLAM pipeline. Each step has a percent-format .py script (open as Jupyter notebook via jupytext) that uses opencv-python + numpy + scipy as an independent ground truth against the Emscripten/Embind WASM modules."
+readme = "README.md"
+requires-python = ">=3.11,<3.13"
+dependencies = [
+  "numpy>=1.26",
+  "opencv-python>=4.10",
+  "scipy>=1.13",
+  "matplotlib>=3.8",
+  "pillow>=10",
+  "jupytext>=1.16",
+]
+
+[dependency-groups]
+dev = [
+  "pytest>=8.0",
+  "jupyterlab>=4.2",
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-ra"
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["F", "E", "B", "I", "UP"]
+ignore = ["E501"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"

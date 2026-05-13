@@ -28,3 +28,11 @@ wasm-src/third_party/sophus/
 wasm-src/third_party/opencv-minimal/
 wasm-src/third_party/cxsparse/
 # g2o, eigen, and opencv live here as git submodules (see .gitmodules) — explicitly tracked.
+
+# Python reference (uv-managed)
+python/.venv/
+python/__pycache__/
+python/**/__pycache__/
+python/.pytest_cache/
+python/.ipynb_checkpoints/
+python/**/.ipynb_checkpoints/
