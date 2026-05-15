@@ -18,28 +18,22 @@
 # 4. 깊이 합리적인 점만 채택
 
 # %%
-import sys
-from pathlib import Path
-
-_HERE = Path(__file__).resolve().parent
-_ROOT = _HERE.parent
-if str(_ROOT) not in sys.path:
-    sys.path.insert(0, str(_ROOT))
-
+import matplotlib.pyplot as plt
 import numpy as np
 
-from myslam_ref.dataset import load_kitti_mini
+from myslam_ref.dataset import load_kitti_dataset
 from myslam_ref.features import Detector, detect, track_lk
 from myslam_ref.triangulation import Algo, triangulate
 from myslam_ref.viz import draw_keypoints, draw_mask_overlay, draw_pointcloud_3d  # noqa: F401
 
 # %%
-ds = load_kitti_mini()
+ds = load_kitti_dataset()
 cam = ds.camera0
 
 # Frame 0 의 stereo init 으로 "기존 점"을 만든다.
 left0, right0 = ds.frames[0].left, ds.frames[0].right
-seeds0 = detect(left0, Detector.GFTT, maxFeatures=120, qualityLevel=0.01, minDistance=20)
+seeds0 = detect(left0, Detector.GFTT, maxFeatures=120,
+                qualityLevel=0.01, minDistance=20)
 tracked0 = track_lk(left0, right0, seeds0)
 ok0 = tracked0[:, 2] > 0.5
 print(f"frame 0 stereo: {int(ok0.sum())}/{seeds0.shape[0]} tracked")
@@ -65,14 +59,18 @@ print(f"masked area ratio: {masked_ratio * 100:.1f}%")
 # ## 2. 마스크 적용 재검출
 
 # %%
-new_seeds = detect(left0, Detector.GFTT, maxFeatures=200, qualityLevel=0.01, minDistance=20, mask=mask)
+new_seeds = detect(left0, Detector.GFTT, maxFeatures=200,
+                   qualityLevel=0.01, minDistance=20, mask=mask)
 print(f"new seeds (mask excluded): {new_seeds.shape[0]}")
 assert new_seeds.shape[0] > 0
 
 # 검출된 새 점은 모두 기존 점에서 ≥ ``PAD`` 픽셀 떨어져 있어야 한다.
+
+
 def min_distance(pt, others):
     d = np.linalg.norm(others[:, :2] - pt[:2], axis=1)
     return float(d.min()) if d.size else float("inf")
+
 
 for new_pt in new_seeds:
     d = min_distance(new_pt, existing_pts)
@@ -95,17 +93,20 @@ assert new_accepted.shape[0] >= 10
 # ## 4. 시각화 — 마스크 영역 + 기존/신규 keypoint overlay + 신규 cloud
 
 # %%
-import matplotlib.pyplot as plt
 
-fig_mask = draw_mask_overlay(left0, mask, title=f"Mask of ±{PAD} px halos around {existing_pts.shape[0]} existing tracks")
+fig_mask = draw_mask_overlay(
+    left0, mask, title=f"Mask of ±{PAD} px halos around {existing_pts.shape[0]} existing tracks")
 
 # %%
 fig_kp, ax_kp = plt.subplots(figsize=(12, 4))
 ax_kp.imshow(left0, cmap="gray", vmin=0, vmax=255)
-ax_kp.scatter(existing_pts[:, 0], existing_pts[:, 1], s=10, edgecolors="cyan", facecolors="none", label=f"existing ({existing_pts.shape[0]})")
-ax_kp.scatter(new_seeds[:, 0], new_seeds[:, 1], s=10, edgecolors="lime", facecolors="none", label=f"new ({new_seeds.shape[0]})")
+ax_kp.scatter(existing_pts[:, 0], existing_pts[:, 1], s=10, edgecolors="cyan",
+              facecolors="none", label=f"existing ({existing_pts.shape[0]})")
+ax_kp.scatter(new_seeds[:, 0], new_seeds[:, 1], s=10, edgecolors="lime",
+              facecolors="none", label=f"new ({new_seeds.shape[0]})")
 ax_kp.set_title("Step 10 · existing (cyan) vs newly detected (lime)")
-ax_kp.axis("off"); ax_kp.legend(loc="upper right")
+ax_kp.axis("off")
+ax_kp.legend(loc="upper right")
 fig_kp.tight_layout()
 
 # %%
@@ -115,4 +116,5 @@ fig_pc = draw_pointcloud_3d(
 )
 
 # %%
-print(f"OK — step10 new map points: produced {new_accepted.shape[0]} fresh landmarks under mask exclusion")
+print(
+    f"OK — step10 new map points: produced {new_accepted.shape[0]} fresh landmarks under mask exclusion")

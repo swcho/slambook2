@@ -15,24 +15,17 @@
 # (rectified KITTI 가정).
 
 # %%
-import sys
-from pathlib import Path
-
-_HERE = Path(__file__).resolve().parent
-_ROOT = _HERE.parent
-if str(_ROOT) not in sys.path:
-    sys.path.insert(0, str(_ROOT))
-
+import matplotlib.pyplot as plt
 import numpy as np
 
 from myslam_ref.camera import Camera, project_batch, project_with_pose, round_trip_max_error
-from myslam_ref.dataset import load_kitti_mini
+from myslam_ref.dataset import load_kitti_dataset
 
 # %% [markdown]
 # ## 1. KITTI mini calib 로 Camera 객체 만들기
 
 # %%
-ds = load_kitti_mini()
+ds = load_kitti_dataset()
 cam0 = Camera(
     fx=ds.camera0.fx, fy=ds.camera0.fy, cx=ds.camera0.cx, cy=ds.camera0.cy,
     baseline=0.0, tx=0.0, ty=0.0, tz=0.0,
@@ -42,8 +35,10 @@ cam1 = Camera(
     baseline=ds.camera1.baseline_m,
     tx=ds.camera1.t[0], ty=ds.camera1.t[1], tz=ds.camera1.t[2],
 )
-print(f"camera0: fx={cam0.fx:.4f} t=({cam0.tx:.4f},{cam0.ty:.4f},{cam0.tz:.4f}) baseline={cam0.baseline:.6f}")
-print(f"camera1: fx={cam1.fx:.4f} t=({cam1.tx:+.4f},{cam1.ty:+.4f},{cam1.tz:+.4f}) baseline={cam1.baseline:.6f}")
+print(
+    f"camera0: fx={cam0.fx:.4f} t=({cam0.tx:.4f},{cam0.ty:.4f},{cam0.tz:.4f}) baseline={cam0.baseline:.6f}")
+print(
+    f"camera1: fx={cam1.fx:.4f} t=({cam1.tx:+.4f},{cam1.ty:+.4f},{cam1.tz:+.4f}) baseline={cam1.baseline:.6f}")
 
 # %% [markdown]
 # ## 2. 단일 점 round-trip
@@ -55,7 +50,8 @@ xyz_in = (0.5, -0.3, 7.2)
 uv = cam0.camera_to_pixel(xyz_in)
 xyz_back = cam0.pixel_to_camera(uv, depth=xyz_in[2])
 err = float(np.linalg.norm(np.asarray(xyz_in) - xyz_back))
-print(f"single round-trip: input={xyz_in}, uv={uv}, back={xyz_back}, |err|={err:.2e}")
+print(
+    f"single round-trip: input={xyz_in}, uv={uv}, back={xyz_back}, |err|={err:.2e}")
 assert err < 1e-10
 
 # %% [markdown]
@@ -108,7 +104,8 @@ assert np.allclose(uv_pose, uv_batch, atol=1e-10)
 # Non-identity pose: rotate 90° around y and translate 2 m along z.
 T = np.eye(4)
 theta = np.pi / 2
-T[:3, :3] = np.array([[np.cos(theta), 0, np.sin(theta)], [0, 1, 0], [-np.sin(theta), 0, np.cos(theta)]])
+T[:3, :3] = np.array([[np.cos(theta), 0, np.sin(theta)], [
+                     0, 1, 0], [-np.sin(theta), 0, np.cos(theta)]])
 T[:3, 3] = [0, 0, 2]
 uv_rot = project_with_pose(cam0.K, T, np.array([[1.0, 0.0, 5.0]]))
 # Manual check: R @ (1, 0, 5) = (cos*1 + sin*5, 0, -sin*1 + cos*5) = (5, 0, -1) at θ=π/2.
@@ -116,8 +113,10 @@ uv_rot = project_with_pose(cam0.K, T, np.array([[1.0, 0.0, 5.0]]))
 pc_pred = np.array([5.0, 0.0, 1.0])
 expected_u = cam0.fx * pc_pred[0] / pc_pred[2] + cam0.cx
 expected_v = cam0.fy * pc_pred[1] / pc_pred[2] + cam0.cy
-assert abs(uv_rot[0, 0] - expected_u) < 1e-6, f"expected u={expected_u}, got {uv_rot[0, 0]}"
-assert abs(uv_rot[0, 1] - expected_v) < 1e-6, f"expected v={expected_v}, got {uv_rot[0, 1]}"
+assert abs(
+    uv_rot[0, 0] - expected_u) < 1e-6, f"expected u={expected_u}, got {uv_rot[0, 0]}"
+assert abs(
+    uv_rot[0, 1] - expected_v) < 1e-6, f"expected v={expected_v}, got {uv_rot[0, 1]}"
 
 # %% [markdown]
 # ## 7. 시각화 — depth 별 stereo disparity 곡선
@@ -125,16 +124,17 @@ assert abs(uv_rot[0, 1] - expected_v) < 1e-6, f"expected v={expected_v}, got {uv
 # rectified stereo 의 ``disparity = fx · baseline / depth`` 곡선을 KITTI mini 값으로 그린다.
 
 # %%
-import matplotlib.pyplot as plt
 
 depths = np.linspace(2, 60, 60)
 disparities = cam0.fx * cam1.baseline / depths
 fig, ax = plt.subplots(figsize=(7, 3.5))
 ax.plot(depths, disparities, color="steelblue")
-ax.axhline(1.0, color="red", linestyle="--", label="1 px (effective range limit)")
+ax.axhline(1.0, color="red", linestyle="--",
+           label="1 px (effective range limit)")
 ax.set_xlabel("depth Z (m)")
 ax.set_ylabel("disparity (px)")
-ax.set_title(f"KITTI 05 mini · fx={cam0.fx:.1f}, baseline={cam1.baseline:.3f} m")
+ax.set_title(
+    f"KITTI 05 mini · fx={cam0.fx:.1f}, baseline={cam1.baseline:.3f} m")
 ax.legend()
 ax.grid(alpha=0.3)
 fig.tight_layout()

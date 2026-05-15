@@ -12,7 +12,7 @@ import numpy as np
 
 from myslam_ref.ba import optimize
 from myslam_ref.camera import Camera, project_batch, round_trip_max_error
-from myslam_ref.dataset import load_kitti_mini
+from myslam_ref.dataset import load_kitti_dataset
 from myslam_ref.features import Detector, detect, render_synth_frame, track_lk
 from myslam_ref.keyframe import decide_fixed_interval, decide_frame_distance, decide_inlier_threshold
 from myslam_ref.pnp import estimate_pose
@@ -25,7 +25,7 @@ from myslam_ref.triangulation import Algo, triangulate
 
 
 def test_kitti_mini_loads_5_stereo_frames():
-    ds = load_kitti_mini()
+    ds = load_kitti_dataset()
     assert len(ds.cameras) == 4
     assert len(ds.frames) == 5
     for f in ds.frames:
@@ -35,7 +35,7 @@ def test_kitti_mini_loads_5_stereo_frames():
 
 
 def test_kitti_mini_camera_intrinsics_and_baseline():
-    ds = load_kitti_mini()
+    ds = load_kitti_dataset()
     cam0 = ds.camera0
     cam1 = ds.camera1
     assert cam0.fx == 707.0912
@@ -61,8 +61,9 @@ def test_camera_round_trip_machine_precision():
 
 
 def test_camera_stereo_disparity_matches_baseline_over_depth():
-    ds = load_kitti_mini()
-    cam0 = Camera(fx=ds.camera0.fx, fy=ds.camera0.fy, cx=ds.camera0.cx, cy=ds.camera0.cy, baseline=0.0)
+    ds = load_kitti_dataset()
+    cam0 = Camera(fx=ds.camera0.fx, fy=ds.camera0.fy,
+                  cx=ds.camera0.cx, cy=ds.camera0.cy, baseline=0.0)
     cam1 = Camera(
         fx=ds.camera1.fx, fy=ds.camera1.fy, cx=ds.camera1.cx, cy=ds.camera1.cy,
         baseline=ds.camera1.baseline_m, tx=ds.camera1.t[0], ty=ds.camera1.t[1], tz=ds.camera1.t[2],
@@ -89,7 +90,8 @@ def test_project_batch_shape_and_consistency():
 def test_synth_frame_4_detectors_above_threshold():
     frame0 = render_synth_frame(0, 0)
     for algo in [Detector.GFTT, Detector.HARRIS, Detector.FAST, Detector.ORB]:
-        pts = detect(frame0, algo, maxFeatures=200, qualityLevel=0.01, minDistance=20, blockSize=3)
+        pts = detect(frame0, algo, maxFeatures=200,
+                     qualityLevel=0.01, minDistance=20, blockSize=3)
         assert pts.shape[0] >= 30, f"{algo.name}: expected ≥ 30 kps, got {pts.shape[0]}"
 
 
@@ -98,8 +100,10 @@ def test_gftt_mask_excludes_hole():
     h, w = frame0.shape
     cx_hole, cy_hole = 588, 170
     mask = np.full((h, w), 255, dtype=np.uint8)
-    mask[max(0, cy_hole - 50):cy_hole + 50, max(0, cx_hole - 50):cx_hole + 50] = 0
-    pts = detect(frame0, Detector.GFTT, maxFeatures=200, qualityLevel=0.01, minDistance=20, mask=mask)
+    mask[max(0, cy_hole - 50):cy_hole + 50,
+         max(0, cx_hole - 50):cx_hole + 50] = 0
+    pts = detect(frame0, Detector.GFTT, maxFeatures=200,
+                 qualityLevel=0.01, minDistance=20, mask=mask)
     in_hole = int(
         np.sum(
             (pts[:, 0] >= cx_hole - 50) & (pts[:, 0] < cx_hole + 50)
@@ -112,8 +116,10 @@ def test_gftt_mask_excludes_hole():
 def test_lk_left_right_synth_disparity_minus_22():
     left = render_synth_frame(0, 0)
     right = render_synth_frame(0, 1)
-    seeds = detect(left, Detector.GFTT, maxFeatures=200, qualityLevel=0.01, minDistance=20)
-    out = track_lk(left, right, seeds, winSize=11, maxLevel=3, maxIter=30, eps=0.01)
+    seeds = detect(left, Detector.GFTT, maxFeatures=200,
+                   qualityLevel=0.01, minDistance=20)
+    out = track_lk(left, right, seeds, winSize=11,
+                   maxLevel=3, maxIter=30, eps=0.01)
     ok = out[:, 2] > 0.5
     rate = float(ok.mean())
     mean_dx = float((out[ok, 0] - seeds[ok, 0]).mean())
@@ -124,8 +130,9 @@ def test_lk_left_right_synth_disparity_minus_22():
 
 
 def test_kitti_real_frame_gftt_returns_kps():
-    ds = load_kitti_mini()
-    pts = detect(ds.frames[0].left, Detector.GFTT, maxFeatures=200, qualityLevel=0.01, minDistance=20)
+    ds = load_kitti_dataset()
+    pts = detect(ds.frames[0].left, Detector.GFTT,
+                 maxFeatures=200, qualityLevel=0.01, minDistance=20)
     assert pts.shape[0] >= 50
 
 
@@ -133,8 +140,9 @@ def test_kitti_real_frame_gftt_returns_kps():
 
 
 def test_stereo_lk_rectified_pair_dy_near_zero():
-    ds = load_kitti_mini()
-    seeds = detect(ds.frames[0].left, Detector.GFTT, maxFeatures=200, qualityLevel=0.01, minDistance=20)
+    ds = load_kitti_dataset()
+    seeds = detect(ds.frames[0].left, Detector.GFTT,
+                   maxFeatures=200, qualityLevel=0.01, minDistance=20)
     tracked = track_lk(ds.frames[0].left, ds.frames[0].right, seeds)
     ok = tracked[:, 2] > 0.5
     assert ok.mean() >= 0.7
@@ -152,8 +160,10 @@ def _stereo_setup_kitti_05_half():
     fx, fy, cx, cy = 360.295, 360.295, 303.605, 92.695
     baseline = 0.537151
     k = np.array([fx, fy, cx, cy])
-    T_l = np.array([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0]], dtype=np.float64)
-    T_r = np.array([[1, 0, 0, -baseline], [0, 1, 0, 0], [0, 0, 1, 0]], dtype=np.float64)
+    T_l = np.array([[1, 0, 0, 0], [0, 1, 0, 0], [
+                   0, 0, 1, 0]], dtype=np.float64)
+    T_r = np.array([[1, 0, 0, -baseline], [0, 1, 0, 0],
+                   [0, 0, 1, 0]], dtype=np.float64)
     return fx, fy, cx, cy, baseline, k, T_l, T_r
 
 
@@ -171,11 +181,13 @@ def test_triangulation_linear_svd_exact():
     fx, fy, cx, cy, baseline, k, T_l, T_r = _stereo_setup_kitti_05_half()
     gt = _grid_world_points()
     N = gt.shape[0]
-    left_pts = np.zeros((N, 3)); right_pts = np.zeros((N, 3))
+    left_pts = np.zeros((N, 3))
+    right_pts = np.zeros((N, 3))
     for i, (x, y, z) in enumerate(gt):
         left_pts[i] = [fx * x / z + cx, fy * y / z + cy, 1.0]
         right_pts[i] = [fx * (x - baseline) / z + cx, fy * y / z + cy, 1.0]
-    svd = triangulate(left_pts, right_pts, k, T_l, k, T_r, algo=Algo.LINEAR_SVD, quality_threshold=0.01)
+    svd = triangulate(left_pts, right_pts, k, T_l, k, T_r,
+                      algo=Algo.LINEAR_SVD, quality_threshold=0.01)
     assert np.linalg.norm(svd[:, :3] - gt, axis=1).max() < 1e-6
     assert svd[:, 3].max() < 1e-9
     assert int((svd[:, 4] > 0.5).sum()) == N
@@ -185,7 +197,8 @@ def test_triangulation_lost_status_yields_zero_nan():
     fx, fy, cx, cy, baseline, k, T_l, T_r = _stereo_setup_kitti_05_half()
     gt = _grid_world_points()
     N = gt.shape[0]
-    left_pts = np.zeros((N, 3)); right_pts = np.zeros((N, 3))
+    left_pts = np.zeros((N, 3))
+    right_pts = np.zeros((N, 3))
     for i, (x, y, z) in enumerate(gt):
         left_pts[i] = [fx * x / z + cx, fy * y / z + cy, 1.0]
         right_pts[i] = [fx * (x - baseline) / z + cx, fy * y / z + cy, 1.0]
@@ -198,13 +211,16 @@ def test_triangulation_inverted_return_flips_ok():
     fx, fy, cx, cy, baseline, k, T_l, T_r = _stereo_setup_kitti_05_half()
     gt = _grid_world_points()
     N = gt.shape[0]
-    left_pts = np.zeros((N, 3)); right_pts = np.zeros((N, 3))
+    left_pts = np.zeros((N, 3))
+    right_pts = np.zeros((N, 3))
     for i, (x, y, z) in enumerate(gt):
         left_pts[i] = [fx * x / z + cx, fy * y / z + cy, 1.0]
         right_pts[i] = [fx * (x - baseline) / z + cx, fy * y / z + cy, 1.0]
     right_pts[:, 1] += 4.0  # epipolar noise
-    fixed = triangulate(left_pts, right_pts, k, T_l, k, T_r, quality_threshold=1e-3, inverted_return=False)
-    inverted = triangulate(left_pts, right_pts, k, T_l, k, T_r, quality_threshold=1e-3, inverted_return=True)
+    fixed = triangulate(left_pts, right_pts, k, T_l, k, T_r,
+                        quality_threshold=1e-3, inverted_return=False)
+    inverted = triangulate(left_pts, right_pts, k, T_l, k,
+                           T_r, quality_threshold=1e-3, inverted_return=True)
     assert int(np.sum((fixed[:, 4] > 0.5) == (inverted[:, 4] > 0.5))) == 0
 
 
@@ -212,31 +228,35 @@ def test_triangulation_inverted_return_flips_ok():
 
 
 def test_initial_map_yields_landmarks_on_kitti_mini():
-    ds = load_kitti_mini()
+    ds = load_kitti_dataset()
     cam0, cam1 = ds.camera0, ds.camera1
     frame0 = ds.frames[0]
-    seeds = detect(frame0.left, Detector.GFTT, maxFeatures=200, qualityLevel=0.01, minDistance=20)
+    seeds = detect(frame0.left, Detector.GFTT, maxFeatures=200,
+                   qualityLevel=0.01, minDistance=20)
     tracked = track_lk(frame0.left, frame0.right, seeds)
     k = np.array([cam0.fx, cam0.fy, cam0.cx, cam0.cy])
     T_l = np.hstack([np.eye(3), np.zeros((3, 1))])
     T_r = np.hstack([np.eye(3), np.array([[-cam1.baseline_m], [0], [0]])])
-    pts = triangulate(seeds, tracked, k, T_l, k, T_r, algo=Algo.LINEAR_SVD, quality_threshold=0.01)
+    pts = triangulate(seeds, tracked, k, T_l, k, T_r,
+                      algo=Algo.LINEAR_SVD, quality_threshold=0.01)
     accepted = pts[pts[:, 4] > 0.5]
     assert accepted.shape[0] >= 30
     assert accepted[:, 2].min() > 0
 
 
 def test_temporal_tracking_chain():
-    ds = load_kitti_mini()
+    ds = load_kitti_dataset()
     prev = ds.frames[0].left
-    seeds_prev = detect(prev, Detector.GFTT, maxFeatures=200, qualityLevel=0.01, minDistance=20)
+    seeds_prev = detect(prev, Detector.GFTT, maxFeatures=200,
+                        qualityLevel=0.01, minDistance=20)
     for frame in ds.frames[1:]:
         curr = frame.left
         tracked = track_lk(prev, curr, seeds_prev)
         rate = float((tracked[:, 2] > 0.5).mean())
         assert rate >= 0.7
         prev = curr
-        seeds_prev = detect(prev, Detector.GFTT, maxFeatures=200, qualityLevel=0.01, minDistance=20)
+        seeds_prev = detect(prev, Detector.GFTT, maxFeatures=200,
+                            qualityLevel=0.01, minDistance=20)
 
 
 # ---- Step 08 --------------------------------------------------------------
@@ -256,10 +276,12 @@ def _pnp_case(seed: int, N: int, noise: float, outlier_fraction: float = 0.0):
         return rand() * 2 - 1
 
     def gauss():
-        u = max(rand(), 1e-12); v = rand()
+        u = max(rand(), 1e-12)
+        v = rand()
         return float(np.sqrt(-2 * np.log(u)) * np.cos(2 * np.pi * v))
 
-    R_gt = cv2.Rodrigues(np.array([uni() * 0.3, uni() * 0.3, uni() * 0.3]).reshape(3, 1))[0]
+    R_gt = cv2.Rodrigues(
+        np.array([uni() * 0.3, uni() * 0.3, uni() * 0.3]).reshape(3, 1))[0]
     t_gt = np.array([uni() * 0.2, uni() * 0.2, 2 + rand() * 0.5])
     K = np.array([[520, 0, 320], [0, 520, 240], [0, 0, 1]], dtype=np.float64)
     pts3, pts2, outliers = [], [], []
@@ -278,7 +300,9 @@ def _pnp_case(seed: int, N: int, noise: float, outlier_fraction: float = 0.0):
             u += 60 if uni() >= 0 else -60
             v += 60 if uni() >= 0 else -60
             outliers.append(i)
-        pts3.append(Pw); pts2.append([u, v]); i += 1
+        pts3.append(Pw)
+        pts2.append([u, v])
+        i += 1
     rvec_gt = cv2.Rodrigues(R_gt)[0].reshape(-1)
     init6 = np.concatenate([
         t_gt + np.array([uni() * 0.3, uni() * 0.3, uni() * 0.3]),
@@ -298,7 +322,8 @@ def test_pnp_noiseless_machine_precision():
 
 def test_pnp_outlier_recall_above_80pct():
     for s in range(20, 23):
-        pts3, pts2, K, R_gt, t_gt, init6, outliers = _pnp_case(s, 100, 1.0, 0.2)
+        pts3, pts2, K, R_gt, t_gt, init6, outliers = _pnp_case(
+            s, 100, 1.0, 0.2)
         res = estimate_pose(pts3, pts2, K, init6)
         hits = sum(1 for idx in outliers if res.final_inlier_mask[idx] == 0)
         recall = hits / max(1, len(outliers))
@@ -327,7 +352,9 @@ def test_keyframe_frame_distance_and_interval():
 def test_ba_noiseless_converges():
     # Smaller scene than the verify suite — pytest budget.
     P, L = 3, 12
-    fx = fy = 520; cx = 240; cy = 200
+    fx = fy = 520
+    cx = 240
+    cy = 200
     K = np.array([[fx, 0, cx], [0, fy, cy], [0, 0, 1]], dtype=np.float64)
     rng = np.random.default_rng(seed=42)
     poses_gt = [(np.eye(3), np.zeros(3))]
@@ -336,7 +363,8 @@ def test_ba_noiseless_converges():
         R, _ = cv2.Rodrigues(rvec)
         t = rng.uniform(-0.3, 0.3, 3)
         poses_gt.append((R, t))
-    lms_gt = np.column_stack([rng.uniform(-1, 1, L), rng.uniform(-1, 1, L), rng.uniform(2, 4, L)])
+    lms_gt = np.column_stack(
+        [rng.uniform(-1, 1, L), rng.uniform(-1, 1, L), rng.uniform(2, 4, L)])
     obs = []
     for p in range(P):
         R, t = poses_gt[p]
@@ -344,7 +372,8 @@ def test_ba_noiseless_converges():
             Pc = R @ lms_gt[li] + t
             if Pc[2] <= 0.5:
                 continue
-            obs.append([p, li, fx * Pc[0] / Pc[2] + cx, fy * Pc[1] / Pc[2] + cy, 1])
+            obs.append([p, li, fx * Pc[0] / Pc[2] +
+                       cx, fy * Pc[1] / Pc[2] + cy, 1])
     init_poses = np.zeros((P, 12))
     for p in range(P):
         R, t = poses_gt[p]
@@ -372,7 +401,8 @@ def test_slam_map_fifo_evicts_chronologically():
         smap.insert_map_point(lp)
     evictions = []
     for i, pose in enumerate(stream["poses"]):
-        _, ev = smap.insert_keyframe(i, pose, stream["observed_landmark_ids"][i], "fifo", PolicyOptions(0.2))
+        _, ev = smap.insert_keyframe(
+            i, pose, stream["observed_landmark_ids"][i], "fifo", PolicyOptions(0.2))
         if ev is not None:
             evictions.append(ev.evicted_kf_id)
     assert evictions == [0, 1, 2, 3, 4, 5]
@@ -384,7 +414,8 @@ def test_slam_map_clean_drops_orphan_landmarks():
     lm_a = smap.insert_map_point([0, 0, 5])
     lm_b = smap.insert_map_point([1, 0, 5])
     smap.insert_keyframe(0, np.eye(4), {lm_a}, "fifo", PolicyOptions(0.2))
-    T = np.eye(4); T[2, 3] = 0.5
+    T = np.eye(4)
+    T[2, 3] = 0.5
     smap.insert_keyframe(1, T, {lm_b}, "fifo", PolicyOptions(0.2))
     assert lm_a not in smap.active_landmark_ids
     assert lm_b in smap.active_landmark_ids
@@ -399,13 +430,14 @@ def test_se3_log_norm_translation():
 
 
 def test_full_pipeline_runs_on_kitti_mini():
-    ds = load_kitti_mini()
+    ds = load_kitti_dataset()
     cam0, cam1 = ds.camera0, ds.camera1
     K = cam0.K
     T_left = np.hstack([np.eye(3), np.zeros((3, 1))])
     T_right = np.hstack([np.eye(3), np.array([[-cam1.baseline_m], [0], [0]])])
     frame0 = ds.frames[0]
-    seeds = detect(frame0.left, Detector.GFTT, maxFeatures=150, qualityLevel=0.01, minDistance=20)
+    seeds = detect(frame0.left, Detector.GFTT, maxFeatures=150,
+                   qualityLevel=0.01, minDistance=20)
     tracked_right = track_lk(frame0.left, frame0.right, seeds)
     tri = triangulate(seeds, tracked_right,
                       np.array([cam0.fx, cam0.fy, cam0.cx, cam0.cy]), T_left,
@@ -424,9 +456,11 @@ def test_full_pipeline_runs_on_kitti_mini():
         tracked = track_lk(prev_left, frame.left, seeds_in)
         ok = tracked[:, 2] > 0.5
         assert ok.mean() >= 0.5
-        init6 = np.concatenate([trajectory[-1][:3, 3], cv2.Rodrigues(trajectory[-1][:3, :3])[0].reshape(-1)])
+        init6 = np.concatenate(
+            [trajectory[-1][:3, 3], cv2.Rodrigues(trajectory[-1][:3, :3])[0].reshape(-1)])
         res = estimate_pose(prev_lms[ok], tracked[ok, :2], K, init6)
-        T_new = np.eye(4); T_new[:3, :] = res.T_cw
+        T_new = np.eye(4)
+        T_new[:3, :] = res.T_cw
         trajectory.append(T_new)
         prev_left = frame.left
         prev_pts = tracked[ok, :2]

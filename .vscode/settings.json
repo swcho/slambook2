@@ -2,5 +2,7 @@
     "files.associations": {
         "iostream": "cpp"
     },
-    "cmake.sourceDirectory": "/Users/swcho/projects/swcho/slambook2/ch13-wasm/wasm-src"
+    "cmake.sourceDirectory": "/Users/swcho/projects/swcho/slambook2/ch13-wasm/wasm-src",
+    "python.envFile": "${workspaceFolder}/.env",
+    "python.terminal.useEnvFile": true
 }

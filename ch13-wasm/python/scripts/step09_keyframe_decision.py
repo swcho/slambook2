@@ -14,14 +14,6 @@
 # 점을 확인한다.
 
 # %%
-import sys
-from pathlib import Path
-
-_HERE = Path(__file__).resolve().parent
-_ROOT = _HERE.parent
-if str(_ROOT) not in sys.path:
-    sys.path.insert(0, str(_ROOT))
-
 import numpy as np
 
 from myslam_ref.keyframe import decide_fixed_interval, decide_frame_distance, decide_inlier_threshold

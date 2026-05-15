@@ -18,14 +18,6 @@
 # (D) RobustKernel 옵션 smoke
 
 # %%
-import sys
-from pathlib import Path
-
-_HERE = Path(__file__).resolve().parent
-_ROOT = _HERE.parent
-if str(_ROOT) not in sys.path:
-    sys.path.insert(0, str(_ROOT))
-
 import cv2
 import numpy as np
 

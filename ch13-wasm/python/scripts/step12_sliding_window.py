@@ -16,14 +16,6 @@
 # 따르며, orphan landmark 가 `cleanMap` 으로 정리됨을 확인한다.
 
 # %%
-import sys
-from pathlib import Path
-
-_HERE = Path(__file__).resolve().parent
-_ROOT = _HERE.parent
-if str(_ROOT) not in sys.path:
-    sys.path.insert(0, str(_ROOT))
-
 import numpy as np
 
 from myslam_ref.se3 import se3_from_translation, se3_log_norm

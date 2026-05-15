@@ -15,16 +15,7 @@
 # `KittiCamera`, `StereoFrame` 자료구조로 노출한다.
 
 # %%
-import sys
-from pathlib import Path
-
-# scripts/ 에서 직접 실행할 때 myslam_ref 를 import 할 수 있도록 부모 디렉토리를 sys.path 에 추가.
-_HERE = Path(__file__).resolve().parent
-_ROOT = _HERE.parent
-if str(_ROOT) not in sys.path:
-    sys.path.insert(0, str(_ROOT))
-
-from myslam_ref.dataset import load_kitti_mini
+from myslam_ref.dataset import load_kitti_dataset
 from myslam_ref.viz import draw_frame_pair  # noqa: F401  (used in notebook mode)
 
 # %% [markdown]
@@ -33,10 +24,11 @@ from myslam_ref.viz import draw_frame_pair  # noqa: F401  (used in notebook mode
 # 기본 경로(`<repo>/ch13-wasm/public/datasets/kitti05-mini`)에서 calib + 5 frame 을 모두 로드.
 
 # %%
-ds = load_kitti_mini()
+ds = load_kitti_dataset()
 print(f"cameras: {len(ds.cameras)}")
 for cam in ds.cameras:
-    print(f"  P{cam.id}: fx={cam.fx:.4f} cx={cam.cx:.4f} t=({cam.t[0]:+.4f}, {cam.t[1]:+.4f}, {cam.t[2]:+.4f}) baseline={cam.baseline_m:.6f} m")
+    print(
+        f"  P{cam.id}: fx={cam.fx:.4f} cx={cam.cx:.4f} t=({cam.t[0]:+.4f}, {cam.t[1]:+.4f}, {cam.t[2]:+.4f}) baseline={cam.baseline_m:.6f} m")
 
 # %% [markdown]
 # ## 2. K, P 행렬 확인 (camera0)
@@ -57,13 +49,16 @@ print(ds.camera0.P)
 cam0 = ds.camera0
 cam1 = ds.camera1
 
-assert len(ds.cameras) == 4, f"expected 4 P_k rows in calib.txt, got {len(ds.cameras)}"
+assert len(
+    ds.cameras) == 4, f"expected 4 P_k rows in calib.txt, got {len(ds.cameras)}"
 assert cam0.fx == 707.0912
 assert cam0.fy == 707.0912
 assert cam0.cx == 601.8873
 assert cam0.cy == 183.1104
-assert abs(cam0.baseline_m) < 1e-9, f"P0 baseline should be 0, got {cam0.baseline_m}"
-assert abs(cam1.baseline_m - 0.5371657) < 1e-4, f"P1 baseline 0.5372 m expected, got {cam1.baseline_m}"
+assert abs(
+    cam0.baseline_m) < 1e-9, f"P0 baseline should be 0, got {cam0.baseline_m}"
+assert abs(cam1.baseline_m -
+           0.5371657) < 1e-4, f"P1 baseline 0.5372 m expected, got {cam1.baseline_m}"
 # P1 stereo is a pure horizontal translation in the rig frame: t ≈ (-0.537, 0, 0).
 assert abs(cam1.t[0] + 0.5371657) < 1e-4
 assert abs(cam1.t[1]) < 1e-9
@@ -73,11 +68,13 @@ assert abs(cam1.t[2]) < 1e-9
 # ## 4. 스테레오 프레임 5 개 검사
 
 # %%
-assert len(ds.frames) == 5, f"expected 5 frames in kitti05-mini, got {len(ds.frames)}"
+assert len(
+    ds.frames) == 5, f"expected 5 frames in kitti05-mini, got {len(ds.frames)}"
 for frame in ds.frames:
     assert frame.left.dtype.name == "uint8"
     assert frame.right.dtype.name == "uint8"
-    assert frame.left.shape == (370, 1226), f"frame {frame.index} left shape {frame.left.shape}"
+    assert frame.left.shape == (
+        370, 1226), f"frame {frame.index} left shape {frame.left.shape}"
     assert frame.right.shape == (370, 1226)
     assert frame.left.shape == frame.right.shape
 
@@ -88,7 +85,8 @@ for frame in ds.frames:
 # Agg 백엔드라 figure 만 생성되고 표시는 생략된다.
 
 # %%
-fig = draw_frame_pair(ds.frames[0], title=f"KITTI 05 mini · frame 0 · {ds.frames[0].width}×{ds.frames[0].height}")
+fig = draw_frame_pair(
+    ds.frames[0], title=f"KITTI 05 mini · frame 0 · {ds.frames[0].width}×{ds.frames[0].height}")
 
 # %%
 print("OK — step01 dataset reference matches kitti05-mini")

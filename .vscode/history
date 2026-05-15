@@ -41,3 +41,75 @@
 : 1777377217:0;cd ch13-wasm
 : 1777377219:0;npm run dev
 : 1777377733:0;claude
+: 1778587415:0;cd ch13-wasm
+: 1778587416:0;ll
+: 1778587431:0;npm run dev
+: 1778589641:0;claude
+: 1778590898:0;cd ch13-wasm
+: 1778590900:0;node --experimental-strip-types scripts/rename-to-6digits.ts --dry-run 'public/datasets/kitti-sample/image_*/*.png'
+: 1778590911:0;node --experimental-strip-types scripts/rename-to-6digits.ts 'public/datasets/kitti-sample/image_*/*.png'
+: 1778670706:0;claude
+: 1778670758:0;cd ch13-wasm
+: 1778670765:0;npm run dev
+: 1778678474:0;claude
+: 1778756986:0;mamba
+: 1778757013:0;python3 -m venv .venv
+: 1778757039:0;exit
+: 1778757116:0;python3 -m venv .venv
+: 1778757136:0;exit
+: 1778757618:0;pip install cv2
+: 1778758097:0;pip install scipy
+: 1778758355:0;pip install cv2
+: 1778758431:0;pip install opencv-python\
+
+: 1778758481:0;pip install matplotlib\
+
+: 1778815827:0;claude
+: 1778817501:0;python --version
+: 1778817517:0;brew upgrade python
+: 1778817602:0;pip freeze > requirements.txt
+: 1778817610:0;rm -rf .venv
+: 1778817615:0;deactivate
+: 1778817627:0;python3 -m venv .venv
+: 1778817633:0;exit
+: 1778817646:0;python --version
+: 1778817655:0;deactivate
+: 1778817658:0;python --version
+: 1778817669:0;brew upgrade python
+: 1778817680:0;python3 --version
+: 1778817686:0;brew upgrade python3
+: 1778817697:0;which python
+: 1778817702:0;which python3
+: 1778817712:0;ll /usr/bin/python3
+: 1778817791:0;brew --prefix
+: 1778817796:0;brew --prefix python
+: 1778817837:0;code ~/.zshrc
+: 1778817940:0;python --version
+: 1778817944:0;python3 --version
+: 1778818004:0;echo $PATH
+: 1778818046:0;source ~/.zshrc
+: 1778818050:0;python3 --version
+: 1778818124:0;echo $PATH
+: 1778818179:0;ll /opt/homebrew/bin
+: 1778818210:0;ll
+: 1778818225:0;source ~/.zshrc
+: 1778818231:0;python3 --version
+: 1778818337:0;claude
+: 1778818888:0;deactivate
+: 1778818894:0;rm -rf .venv
+: 1778818900:0;python --version
+: 1778818904:0;python3 --version
+: 1778818906:0;exit
+: 1778818910:0;python3 --version
+: 1778819540:0;python -m venv .venv
+: 1778819547:0;pip --versioin
+: 1778819577:0;pip install -r requirements.txt
+: 1778819594:0;exit
+: 1778819606:0;pip install -r requirements.txt
+: 1778819766:0;pip install matplotlib
+: 1778819808:0;pip install scipy
+: 1778819827:0;pip install opencv-pythone
+: 1778819831:0;pip install opencv-python
+: 1778819855:0;pip freeze > requirements.txt
+: 1778820367:0;exit
+: 1778820377:0;claude

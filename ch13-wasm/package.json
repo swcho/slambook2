@@ -28,7 +28,7 @@
     "test:e2e": "playwright test",
     "test:e2e:report": "playwright show-report",
     "verify:py": "cd python && uv run pytest -v",
-    "verify:py:steps": "cd python && for s in step01_dataset step02_camera step03_feature_detection step04_stereo_matching step05_triangulation step06_initial_map step07_frame_tracking step08_pose_estimation step09_keyframe_decision step10_new_map_points step11_bundle_adjustment step12_sliding_window step13_full_pipeline; do echo \"=== $s ===\"; uv run python scripts/$s.py | tail -1 || exit 1; done"
+    "verify:py:steps": "cd python && for s in step01_dataset step02_camera step03_feature_detection step04_stereo_matching step05_triangulation step06_initial_map step07_frame_tracking step08_pose_estimation step09_keyframe_decision step10_new_map_points step11_bundle_adjustment step12_sliding_window step13_full_pipeline; do echo \"=== $s ===\"; uv run --env-file .env python scripts/$s.py | tail -1 || exit 1; done"
   },
   "dependencies": {
     "@react-three/drei": "^9.122.0",

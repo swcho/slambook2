@@ -35,3 +35,5 @@
 *.idea
 **build**
 !**/BUILD_NOTES.md
+
+.venv

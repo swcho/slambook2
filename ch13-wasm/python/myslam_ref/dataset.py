@@ -1,12 +1,17 @@
 """KITTI mini dataset loader — Python mirror of src/lib/kitti.ts.
 
-Parses the odometry-style ``calib.txt`` (4 rows of ``P<k>: <12 floats>``) and
-loads stereo PNG pairs from ``image_0/`` and ``image_1/``. Output shapes match
-the TS loader so a Python reference can read the same fixtures the WASM build
-ships with.
+Supports two KITTI calibration formats (same as the TS loader):
 
-The TS loader applies a 0.5 downsample by default (UI display). For ground-truth
-verification we default to ``downsample=1.0`` so K matches calib.txt verbatim.
+* odometry ``calib.txt``           — rows ``P<k>: <12 floats>``
+* raw      ``calib_cam_to_cam.txt`` — rows ``P_rect_0<k>: <12 floats>``
+
+Stereo PNG pairs are read from ``image_0/`` and ``image_1/``. Output shapes
+match the TS loader so a Python reference can read the same fixtures the WASM
+build ships with.
+
+The TS loader applies a 0.5 downsample by default (UI display). For
+ground-truth verification we default to ``downsample=1.0`` so K matches the
+calibration file verbatim.
 """
 
 from __future__ import annotations
@@ -18,7 +23,9 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-_DEFAULT_DATASET_DIR = Path(__file__).resolve().parents[2] / "public" / "datasets" / "kitti05-mini"
+_DEFAULT_DATASET_DIR = Path(
+    __file__).resolve().parents[2] / "public" / "datasets"
+_DEFAULT_DATASET_DIR_MINI = _DEFAULT_DATASET_DIR / "kitti05-mini"
 
 
 @dataclass(frozen=True)
@@ -66,10 +73,51 @@ class KittiMini:
         return self.cameras[1]
 
 
+_ODOMETRY_ROW = re.compile(r"^P(\d):\s*(.+)$")
+_RAW_ROW = re.compile(r"^P_rect_0(\d):\s*(.+)$")
+
+
 def parse_kitti_calib(text: str, downsample: float = 1.0) -> list[KittiCamera]:
     """Parse odometry-style calib.txt — lines ``P<k>: <12 floats>``."""
+    return _parse_projection_rows(
+        text, _ODOMETRY_ROW, downsample, label="calib.txt", row_name="P"
+    )
+
+
+def parse_kitti_raw_calib(text: str, downsample: float = 1.0) -> list[KittiCamera]:
+    """Parse raw-style calib_cam_to_cam.txt — lines ``P_rect_0<k>: <12 floats>``.
+
+    Other rows (``S_``, ``K_``, ``D_``, ``R_``, ``T_``, ``R_rect_``) are
+    ignored — we only need the post-rectification projection matrices that
+    apply to the ``image_0X`` streams.
+    """
+    return _parse_projection_rows(
+        text,
+        _RAW_ROW,
+        downsample,
+        label="calib_cam_to_cam.txt",
+        row_name="P_rect_0",
+    )
+
+
+def parse_kitti_calib_auto(text: str, downsample: float = 1.0) -> list[KittiCamera]:
+    """Parse either calib format, dispatching on whichever row pattern matches."""
+    if _RAW_ROW.search(text) is not None or any(
+        _RAW_ROW.match(line.strip()) for line in text.splitlines()
+    ):
+        return parse_kitti_raw_calib(text, downsample=downsample)
+    return parse_kitti_calib(text, downsample=downsample)
+
+
+def _parse_projection_rows(
+    text: str,
+    pattern: re.Pattern[str],
+    downsample: float,
+    *,
+    label: str,
+    row_name: str,
+) -> list[KittiCamera]:
     cameras: list[KittiCamera] = []
-    pattern = re.compile(r"^P(\d):\s*(.+)$")
     for raw in text.splitlines():
         line = raw.strip()
         if not line:
@@ -80,11 +128,13 @@ def parse_kitti_calib(text: str, downsample: float = 1.0) -> list[KittiCamera]:
         cam_id = int(m.group(1))
         nums = m.group(2).split()
         if len(nums) != 12:
-            raise ValueError(f"calib.txt: P{cam_id} expects 12 floats, got {len(nums)}: {line}")
+            raise ValueError(
+                f"{label}: {row_name}{cam_id} expects 12 floats, got {len(nums)}: {line}"
+            )
         p = np.asarray([float(x) for x in nums], dtype=np.float64)
         cameras.append(_build_camera(cam_id, p, downsample))
     if not cameras:
-        raise ValueError("calib.txt contained no P<k> rows")
+        raise ValueError(f"{label} contained no {row_name}<k> rows")
     cameras.sort(key=lambda c: c.id)
     return cameras
 
@@ -114,26 +164,38 @@ def _build_camera(cam_id: int, p: np.ndarray, downsample: float) -> KittiCamera:
     )
 
 
-def load_kitti_mini(
-    root: str | Path | None = None,
+def _resolve_calib_path(root_path: Path) -> Path:
+    """Pick the calibration file, preferring the raw filename when present."""
+    for name in ("calib_cam_to_cam.txt", "calib.txt"):
+        candidate = root_path / name
+        if candidate.exists():
+            return candidate
+    raise FileNotFoundError(
+        f"no calib_cam_to_cam.txt or calib.txt under {root_path}"
+    )
+
+
+def load_kitti_dataset(
+    dataset: str | Path | None = None,
     *,
     downsample: float = 1.0,
     max_frames: int | None = None,
 ) -> KittiMini:
-    """Load calib + stereo PNG pairs from a KITTI odometry-mini directory.
+    """Load calib + stereo PNG pairs from a KITTI mini directory.
 
-    Defaults to ``<repo>/ch13-wasm/public/datasets/kitti05-mini``. Returns a
-    :class:`KittiMini` with all frames found under ``image_0/NNNNNN.png`` /
-    ``image_1/NNNNNN.png``.
+    Defaults to ``<repo>/ch13-wasm/public/datasets/kitti05-mini``. Accepts both
+    odometry (``calib.txt``: ``P<k>`` rows) and raw (``calib_cam_to_cam.txt``:
+    ``P_rect_0<k>`` rows) layouts; the calibration file is picked by name and
+    parsed by content. Returns a :class:`KittiMini` with all frames found
+    under ``image_0/NNNNNN.png`` / ``image_1/NNNNNN.png``.
     """
-    root_path = Path(root) if root is not None else _DEFAULT_DATASET_DIR
+    root_path = Path(_DEFAULT_DATASET_DIR /
+                     dataset) if dataset is not None else _DEFAULT_DATASET_DIR_MINI
     if not root_path.exists():
         raise FileNotFoundError(f"KITTI mini root not found: {root_path}")
 
-    calib_path = root_path / "calib.txt"
-    if not calib_path.exists():
-        raise FileNotFoundError(f"calib.txt not found at {calib_path}")
-    cameras = parse_kitti_calib(calib_path.read_text(), downsample=downsample)
+    calib_path = _resolve_calib_path(root_path)
+    cameras = parse_kitti_calib_auto(calib_path.read_text(), downsample=downsample)
 
     left_dir = root_path / "image_0"
     right_dir = root_path / "image_1"
@@ -147,14 +209,18 @@ def load_kitti_mini(
         left = cv2.imread(str(left_dir / fname), cv2.IMREAD_GRAYSCALE)
         right = cv2.imread(str(right_dir / fname), cv2.IMREAD_GRAYSCALE)
         if left is None or right is None:
-            raise FileNotFoundError(f"failed to decode frame {fname} (left={left is not None}, right={right is not None})")
+            raise FileNotFoundError(
+                f"failed to decode frame {fname} (left={left is not None}, right={right is not None})")
         if left.shape != right.shape:
-            raise ValueError(f"stereo size mismatch at {fname}: L={left.shape} R={right.shape}")
+            raise ValueError(
+                f"stereo size mismatch at {fname}: L={left.shape} R={right.shape}")
         if downsample != 1.0:
             new_w = max(1, round(left.shape[1] * downsample))
             new_h = max(1, round(left.shape[0] * downsample))
-            left = cv2.resize(left, (new_w, new_h), interpolation=cv2.INTER_AREA)
-            right = cv2.resize(right, (new_w, new_h), interpolation=cv2.INTER_AREA)
+            left = cv2.resize(left, (new_w, new_h),
+                              interpolation=cv2.INTER_AREA)
+            right = cv2.resize(right, (new_w, new_h),
+                               interpolation=cv2.INTER_AREA)
         frames.append(StereoFrame(index=idx, left=left, right=right))
 
     return KittiMini(cameras=cameras, frames=frames)
