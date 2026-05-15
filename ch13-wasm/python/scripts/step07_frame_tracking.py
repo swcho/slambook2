@@ -22,7 +22,7 @@ from myslam_ref.features import Detector, detect, track_lk
 from myslam_ref.viz import draw_flow_field  # noqa: F401
 
 # %%
-ds = load_kitti_dataset()
+ds = load_kitti_dataset('kitti-sample')
 
 # %% [markdown]
 # ## 1. Pairwise tracking — 5 frame chain
