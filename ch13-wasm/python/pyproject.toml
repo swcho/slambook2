@@ -11,6 +11,7 @@ dependencies = [
   "matplotlib>=3.8",
   "pillow>=10",
   "jupytext>=1.16",
+  "gtsam>=4.2.1",
 ]
 
 [dependency-groups]

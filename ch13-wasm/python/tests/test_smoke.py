@@ -15,7 +15,13 @@ from myslam_ref.camera import Camera, project_batch, round_trip_max_error
 from myslam_ref.dataset import load_kitti_dataset
 from myslam_ref.features import Detector, detect, render_synth_frame, track_lk
 from myslam_ref.keyframe import decide_fixed_interval, decide_frame_distance, decide_inlier_threshold
-from myslam_ref.pnp import estimate_pose
+from myslam_ref.pnp import (
+    estimate_pose,
+    estimate_pose_cv2,
+    estimate_pose_g2o,
+    estimate_pose_handwritten,
+    estimate_pose_scipy,
+)
 from myslam_ref.se3 import se3_from_translation, se3_log_norm
 from myslam_ref.slam_map import Policy, PolicyOptions, SlamMap, build_synthetic_kf_stream
 from myslam_ref.triangulation import Algo, triangulate
@@ -328,6 +334,47 @@ def test_pnp_outlier_recall_above_80pct():
         hits = sum(1 for idx in outliers if res.final_inlier_mask[idx] == 0)
         recall = hits / max(1, len(outliers))
         assert recall >= 0.8
+
+
+# Step 08 — 4 변종 cross-check: §A noiseless 머신 정밀도 / §C outlier recall.
+# g2o 변종은 gtsam (또는 g2o-python) 의존성에 따라 ImportError 시 skip.
+import pytest  # noqa: E402  — placed mid-file to keep diff small
+
+
+_PNP_VARIANTS = [
+    ("cv2", estimate_pose_cv2),
+    ("scipy", estimate_pose_scipy),
+    ("handwritten", estimate_pose_handwritten),
+    ("g2o", estimate_pose_g2o),
+]
+
+
+@pytest.mark.parametrize("name,fn", _PNP_VARIANTS)
+def test_pnp_variant_noiseless_machine_precision(name, fn):
+    for s in range(1, 6):
+        pts3, pts2, K, R_gt, t_gt, init6, _ = _pnp_case(s, 40, 0.0)
+        try:
+            res = fn(pts3, pts2, K, init6)
+        except ImportError:
+            pytest.skip(f"{name}: backend not installed")
+        rvec, _ = cv2.Rodrigues(res.T_cw[:, :3] @ R_gt.T)
+        assert float(np.linalg.norm(rvec)) < 1e-6, f"{name} rotErr too high at seed={s}"
+        assert float(np.linalg.norm(res.T_cw[:, 3] - t_gt)) < 1e-6, (
+            f"{name} trErr too high at seed={s}"
+        )
+
+
+@pytest.mark.parametrize("name,fn", _PNP_VARIANTS)
+def test_pnp_variant_outlier_recall_above_80pct(name, fn):
+    for s in range(20, 23):
+        pts3, pts2, K, R_gt, t_gt, init6, outliers = _pnp_case(s, 100, 1.0, 0.2)
+        try:
+            res = fn(pts3, pts2, K, init6)
+        except ImportError:
+            pytest.skip(f"{name}: backend not installed")
+        hits = sum(1 for idx in outliers if res.final_inlier_mask[idx] == 0)
+        recall = hits / max(1, len(outliers))
+        assert recall >= 0.8, f"{name} recall={recall:.2f} < 0.8 at seed={s}"
 
 
 # ---- Step 09 --------------------------------------------------------------
