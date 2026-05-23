@@ -24,12 +24,12 @@ SurfelCloudPtr reconstructSurface(
         const PointCloudPtr &input, float radius, int polynomial_order) {
     pcl::MovingLeastSquares<PointT, SurfelT> mls;
     pcl::search::KdTree<PointT>::Ptr tree(new pcl::search::KdTree<PointT>);
-    mls.setSearchMethod(tree);
-    mls.setSearchRadius(radius);
-    mls.setComputeNormals(true);
+    mls.setSearchMethod(tree);      // KdTree로 근접 이웃 탐색
+    mls.setSearchRadius(radius);    // 탐색 반경 (0.05m)
+    mls.setComputeNormals(true);    // 법선 계산 활성화
     mls.setSqrGaussParam(radius * radius);
     mls.setPolynomialFit(polynomial_order > 1);
-    mls.setPolynomialOrder(polynomial_order);
+    mls.setPolynomialOrder(polynomial_order);   // 2차 다항식 피팅
     mls.setInputCloud(input);
     SurfelCloudPtr output(new SurfelCloud);
     mls.process(*output);
@@ -46,15 +46,15 @@ pcl::PolygonMeshPtr triangulateMesh(const SurfelCloudPtr &surfels) {
     pcl::PolygonMeshPtr triangles(new pcl::PolygonMesh);
 
     // Set the maximum distance between connected points (maximum edge length)
-    gp3.setSearchRadius(0.05);
+    gp3.setSearchRadius(0.05);  // 연결될 점 사이 최대 거리(엣지 최대 길이)
 
     // Set typical values for the parameters
-    gp3.setMu(2.5);
-    gp3.setMaximumNearestNeighbors(100);
-    gp3.setMaximumSurfaceAngle(M_PI / 4); // 45 degrees
-    gp3.setMinimumAngle(M_PI / 18); // 10 degrees
-    gp3.setMaximumAngle(2 * M_PI / 3); // 120 degrees
-    gp3.setNormalConsistency(true);
+    gp3.setMu(2.5);             // 거리 승수
+    gp3.setMaximumNearestNeighbors(100);    // 고려할 최대 이웃 수
+    gp3.setMaximumSurfaceAngle(M_PI / 4);   // 45도
+    gp3.setMinimumAngle(M_PI / 18);         // 10도 (삼각형 최소 각도)
+    gp3.setMaximumAngle(2 * M_PI / 3);      // 120도 (삼각형 최대 각도)
+    gp3.setNormalConsistency(true);         // 법선 일관성 유지
 
     // Get result
     gp3.setInputCloud(surfels);
