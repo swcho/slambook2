@@ -24,7 +24,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from keyframe import Camera
+from keyframe import Camera, KeyframeStore, matcher_for
 
 SCHEMA_VERSION = "1.0"
 
@@ -345,3 +345,156 @@ class Trajectory:
             pairs=pairs,
             extra=d.get("extra", {}),
         )
+
+
+# --------------------------------------------------------------------------- #
+# Bridge across failed pairs
+# --------------------------------------------------------------------------- #
+
+
+@dataclass
+class BridgeAttempt:
+    """Audit record for one bridge attempt at a segment boundary."""
+
+    seg_a_idx: int                  # boundary lies between segments[k] and segments[k+1]
+    frame_a: int                    # actual frame indices used (may skip the bad frame)
+    frame_b: int
+    method: str                     # "essential:di,dj" / "homography:di,dj"
+    success: bool
+    n_matches: int
+    n_inliers_pose: int
+    rp: RelativePose | None = None
+
+    def __repr__(self) -> str:
+        tag = "ok " if self.success else "no "
+        return (f"<Bridge {tag}seg{self.seg_a_idx}->{self.seg_a_idx + 1} "
+                f"f{self.frame_a}-{self.frame_b} {self.method} "
+                f"m={self.n_matches} in={self.n_inliers_pose}>")
+
+
+def bridge_segments(
+    traj: Trajectory,
+    store: KeyframeStore,
+    *,
+    estimator: EssentialMatrixEstimator | None = None,
+    homography: HomographyEstimator | None = None,
+    skip_offsets: tuple[tuple[int, int], ...] = ((0, 0), (1, 0), (0, 1), (1, 1)),
+    ratio: float = 0.75,
+) -> tuple["Trajectory", list[BridgeAttempt]]:
+    """Recover the link between consecutive segments and splice them into a
+    common world frame.
+
+    For each boundary between segments[k] and segments[k+1] we try candidate
+    frame pairs `(eA - 1 - di, sB + dj)` for (di, dj) in `skip_offsets`.
+    (0, 0) is the natural "skip the one bad frame" case — usually the only
+    one needed. For each candidate, descriptors are re-matched with Lowe
+    ratio and the essential-matrix estimator is run first, falling back to
+    homography on failure. First success becomes the link.
+
+    Recovers rotation + unit-norm translation direction across the gap. Does
+    NOT recover metric scale — monocular pairs are scale-free, same as in
+    `from_pairs`. The skipped invalid frame between A and B stays invalid,
+    so `traj.positions` still has NaN there; downstream plots will break at
+    that one frame but everything after sits in segment A's world frame.
+
+    Returns (new_traj, attempts). `attempts` includes both successes and
+    failures so callers can inspect why bridges failed and tune thresholds.
+    `new_traj.extra["world_group"]` records which segments share a world
+    frame: segments k and l are in the same frame iff world_group[k] == world_group[l].
+    """
+    estimator = estimator or EssentialMatrixEstimator()
+    homography = homography or HomographyEstimator()
+    det = traj.detector
+    K = traj.camera.K
+    matcher = matcher_for(store.detectors[det])
+
+    poses = traj.poses_wc.copy()
+    world_group = list(range(len(traj.segments)))
+    attempts: list[BridgeAttempt] = []
+
+    for k in range(len(traj.segments) - 1):
+        s_a, e_a = traj.segments[k]
+        s_b, e_b = traj.segments[k + 1]
+
+        link: RelativePose | None = None
+        for di, dj in skip_offsets:
+            fa, fb = e_a - 1 - di, s_b + dj
+            if fa < s_a or fb >= e_b:
+                continue
+
+            pts_a, pts_b, n_match = _bridge_match(store, det, fa, fb, matcher, ratio)
+
+            for tag, est in (("essential", estimator), ("homography", homography)):
+                rp = est.estimate(pts_a, pts_b, K, frame_a=fa, frame_b=fb)
+                attempts.append(BridgeAttempt(
+                    seg_a_idx=k, frame_a=fa, frame_b=fb,
+                    method=f"{tag}:{di},{dj}", success=rp.success,
+                    n_matches=n_match, n_inliers_pose=rp.n_inliers_pose, rp=rp,
+                ))
+                if rp.success:
+                    link = rp
+                    break
+            if link is not None:
+                break
+
+        if link is None:
+            continue
+
+        # link gives T_{fb<-fa}; we want segment B re-expressed in A's world frame
+        # so frame fb anchors as:  T_wc^new[fb] = T_wc^new[fa] @ link.T_ab().
+        # Apply the same fix to every valid frame in segment B:
+        #     T_wc^new[i] = T_fix @ T_wc^B[i]
+        #     T_fix = T_wc^new[fb] @ inv(T_wc^B[fb])
+        T_anchor_new = poses[link.frame_a] @ link.T_ab()
+        T_anchor_old = traj.poses_wc[link.frame_b]
+        T_fix = T_anchor_new @ np.linalg.inv(T_anchor_old)
+        for i in range(s_b, e_b):
+            if traj.valid[i]:
+                poses[i] = T_fix @ traj.poses_wc[i]
+
+        world_group[k + 1] = world_group[k]
+
+    new_extra = {
+        **traj.extra,
+        "world_group": world_group,
+        "n_bridges": sum(1 for a in attempts if a.success),
+    }
+    return Trajectory(
+        detector=traj.detector,
+        method=traj.method + "+bridge",
+        camera=traj.camera,
+        frame_ids=list(traj.frame_ids),
+        poses_wc=poses,
+        valid=traj.valid.copy(),
+        segments=list(traj.segments),
+        pairs=list(traj.pairs),
+        extra=new_extra,
+    ), attempts
+
+
+def _bridge_match(store: KeyframeStore, det: str, fa: int, fb: int,
+                  matcher: cv2.BFMatcher, ratio: float):
+    fs_a = store.frames[fa].features[det]
+    fs_b = store.frames[fb].features[det]
+    if len(fs_a) < 2 or len(fs_b) < 2:
+        empty = np.zeros((0, 2), np.float32)
+        return empty, empty, 0
+    knn = matcher.knnMatch(fs_a.descriptors, fs_b.descriptors, k=2)
+    qi, ti = [], []
+    for pair in knn:
+        if len(pair) < 2:
+            continue
+        m, second = pair
+        if m.distance < ratio * second.distance:
+            qi.append(m.queryIdx)
+            ti.append(m.trainIdx)
+    if not qi:
+        empty = np.zeros((0, 2), np.float32)
+        return empty, empty, 0
+    qi_arr = np.asarray(qi)
+    ti_arr = np.asarray(ti)
+    return (
+        fs_a.xy[qi_arr].astype(np.float32),
+        fs_b.xy[ti_arr].astype(np.float32),
+        len(qi),
+    )

@@ -21,8 +21,8 @@
 # `Line2D` 가 자동으로 break — 별도 처리 불필요.
 #
 # 출력
-# - `data/260523_house/keyframes/trajectories/<detector>_animated.mp4`
-# - `data/260523_house/keyframes/trajectories/<detector>_animation_final.png`
+# - `data/260523_house/keyframes/trajectories/<detector>_bridged_animated.mp4`
+# - `data/260523_house/keyframes/trajectories/<detector>_bridged_animation_final.png`
 
 # %%
 import time
@@ -52,7 +52,7 @@ KP_DOWNSCALE_RADIUS = 4   # keypoint circle radius in the downsampled image
 
 # %%
 store = KeyframeStore.load(STORE_DIR, load_features=True)
-traj = Trajectory.load(TRAJ_DIR / f"{DETECTOR}.json")
+traj = Trajectory.load(TRAJ_DIR / f"{DETECTOR}_bridged.json")
 positions = traj.positions  # (N, 3) NaN where invalid
 xs, zs = positions[:, 0], positions[:, 2]
 n = len(traj.frame_ids)
@@ -172,7 +172,7 @@ print(f"rendering animation @ {FPS} fps ...")
 t0 = time.perf_counter()
 
 anim = animation.FuncAnimation(fig, update, frames=n, interval=1000 / FPS, blit=False)
-out_path = TRAJ_DIR / f"{DETECTOR}_animated.mp4"
+out_path = TRAJ_DIR / f"{DETECTOR}_bridged_animated.mp4"
 writer = animation.FFMpegWriter(fps=FPS, codec="libx264",
                                 extra_args=["-pix_fmt", "yuv420p", "-preset", "fast"])
 anim.save(str(out_path), writer=writer, dpi=120)
@@ -185,7 +185,7 @@ print(f"  done in {time.perf_counter() - t0:.1f}s -> {out_path}")
 
 # %%
 update(n - 1)
-final_path = TRAJ_DIR / f"{DETECTOR}_animation_final.png"
+final_path = TRAJ_DIR / f"{DETECTOR}_bridged_animation_final.png"
 # re-create figure since plt.close above closed it; quicker: re-draw via savefig
 # We already closed it, so build a small static plot at the end state.
 fig_static, (ax_i, ax_t) = plt.subplots(1, 2, figsize=(11, 6.5),

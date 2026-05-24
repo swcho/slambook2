@@ -29,7 +29,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from keyframe import KeyframeStore
-from pose import EssentialMatrixEstimator, Trajectory
+from pose import EssentialMatrixEstimator, Trajectory, bridge_segments
 
 HERE = Path.cwd() if "__file__" not in globals() else Path(__file__).resolve().parent
 DATA_DIR = HERE.parent / "data" / "260523_house"
@@ -62,6 +62,7 @@ estimator = EssentialMatrixEstimator(threshold_px=1.0, prob=0.999,
 
 # %%
 trajectories: dict[str, Trajectory] = {}
+trajectories_bridged: dict[str, Trajectory] = {}
 
 for det in DETECTORS:
     t0 = time.perf_counter()
@@ -107,6 +108,22 @@ for det in DETECTORS:
     traj.save(json_path)
     print(f"    -> {json_path.relative_to(STORE_DIR)}")
 
+    # Bridge across failed pairs — splice segments into a common world frame
+    # where possible. Saves alongside the raw trajectory so the two are
+    # directly comparable.
+    bridged, attempts = bridge_segments(traj, store)
+    n_gaps = len(traj.segments) - 1
+    n_ok = bridged.extra["n_bridges"]
+    n_groups = len(set(bridged.extra["world_group"]))
+    print(
+        f"    bridge: {n_ok}/{n_gaps} gaps closed -> "
+        f"{n_groups} world group(s) (from {len(traj.segments)} segments)"
+    )
+    bridged_path = OUT_DIR / f"{det}_bridged.json"
+    bridged.save(bridged_path)
+    print(f"    -> {bridged_path.relative_to(STORE_DIR)}")
+    trajectories_bridged[det] = bridged
+
 
 # %% [markdown]
 # ## 개별 trajectory plot (XZ — top-down)
@@ -141,6 +158,74 @@ for det, traj in trajectories.items():
     )
     ax.grid(alpha=0.3)
     out = OUT_DIR / f"{det}_xz.png"
+    fig.tight_layout()
+    fig.savefig(out, dpi=130)
+    plt.close(fig)
+    print(f"  {det:5s} -> {out.name}")
+
+
+# %% [markdown]
+# ## Bridged trajectory plot (XZ — top-down)
+#
+# 같은 `world_group` 에 속한 segment들은 같은 색으로 묶고, bridged gap 은 dotted
+# connector 로 잇는다. Bridge 가 성공할수록 색 묶음이 적어지고, dotted 선이
+# 부드럽게 이어지는 모양이 된다.
+
+# %%
+def plot_xz_bridged(ax, traj: Trajectory) -> None:
+    """Color segments by world_group, connect bridged segments with dotted lines."""
+    groups = traj.extra.get("world_group", list(range(len(traj.segments))))
+    cmap = plt.get_cmap("tab20")
+    color_of_group: dict[int, tuple] = {}
+    for k, (s, e) in enumerate(traj.segments):
+        if e - s < 2:
+            continue
+        g = groups[k]
+        if g not in color_of_group:
+            color_of_group[g] = cmap(len(color_of_group) % cmap.N)
+        c = color_of_group[g]
+        seg = traj.positions[s:e]
+        ax.plot(seg[:, 0], seg[:, 2], color=c, linewidth=1.4, alpha=0.95)
+        ax.plot(seg[0, 0], seg[0, 2], "o", color=c, markersize=4)
+        ax.plot(seg[-1, 0], seg[-1, 2], "s", color=c, markersize=4)
+        # dotted connector across the bridged invalid frame to the next segment
+        # in the same world group (if any).
+        if k + 1 < len(traj.segments) and groups[k + 1] == g:
+            nxt_s = traj.segments[k + 1][0]
+            a = traj.positions[e - 1]
+            b = traj.positions[nxt_s]
+            if np.isfinite(a).all() and np.isfinite(b).all():
+                ax.plot([a[0], b[0]], [a[2], b[2]],
+                        color=c, linewidth=0.9, linestyle=":", alpha=0.7)
+
+
+for det, bridged in trajectories_bridged.items():
+    raw = trajectories[det]
+    fig, axes = plt.subplots(1, 2, figsize=(14, 7), sharex=False, sharey=False)
+    plot_xz_segments(axes[0], raw, COLORS[det])
+    plot_xz_bridged(axes[1], bridged)
+
+    s_raw = raw.summary()
+    n_groups = len(set(bridged.extra["world_group"]))
+    n_bridges = bridged.extra["n_bridges"]
+
+    for ax in axes:
+        ax.set_aspect("equal")
+        ax.set_xlabel("X (unit-norm cumulative)")
+        ax.set_ylabel("Z (unit-norm cumulative)")
+        ax.grid(alpha=0.3)
+    axes[0].set_title(
+        f"{det.upper()} — raw\n"
+        f"{s_raw['n_segments']} segments, "
+        f"success {s_raw['n_success_pairs']}/{s_raw['n_total_pairs']}"
+    )
+    axes[1].set_title(
+        f"{det.upper()} — bridged\n"
+        f"{n_bridges}/{s_raw['n_segments'] - 1} gaps closed, "
+        f"{n_groups} world group(s)"
+    )
+
+    out = OUT_DIR / f"{det}_bridged_xz.png"
     fig.tight_layout()
     fig.savefig(out, dpi=130)
     plt.close(fig)
