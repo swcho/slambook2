@@ -14,10 +14,12 @@ database for the `260523_house` capture (`experiments/data/260523_house/sample.m
 | `05_plot_match_counts.py` | Linear + log plots of matches/frame, shading all-detector-zero runs | `data/260523_house/keyframes/matches/match_counts_by_detector.png` |
 | `06_pose_estimation.py` | 5-point essential-matrix (RANSAC) + recoverPose per detector; builds segmented monocular trajectory, bridges failed pairs into world-frame groups, renders raw + bridged plots | `data/260523_house/keyframes/trajectories/` |
 | `07_trajectory_animation.py` | Frame-by-frame MP4: current image + keypoint overlay (left) + accumulated XZ trajectory with current-camera marker (right) | `data/260523_house/keyframes/trajectories/<det>_bridged_animated.mp4` |
+| `08_loop_closures.py` | TF-IDF BoW retrieval (vocab trained per-detector) + essential-matrix geometry verification; emits long-range loop-closure edges for downstream pose-graph optimization | `data/260523_house/keyframes/loop_closures/` |
 | `keyframe.py` | Library: `Camera`, `FeatureSet`, `Keyframe`, `KeyframeStore`, detector adapters | — |
 | `pose.py` | Library: `RelativePose`, `EssentialMatrixEstimator`, `HomographyEstimator`, `Trajectory`, `bridge_segments`, `BridgeAttempt` | — |
+| `loop_closure.py` | Library: `LoopClosureConfig`, `LoopClosure`, `build_vocabulary` / `bow_histograms` / `retrieve_candidates` / `verify`, `detect_loop_closures` | — |
 
-Pipeline order: `01 → 02 → 03 → 04 → 05 → 06 → 07`. Scripts ≥ 03 only read the
+Pipeline order: `01 → 02 → 03 → 04 → 05 → 06 → 07 → 08`. Scripts ≥ 03 only read the
 keyframe store and pre-computed sidecars, so they can be re-run independently.
 
 ### Frame extraction (manual, until `01_*` is filled in)
@@ -46,7 +48,12 @@ python 04_match_pairwise.py        # ~11 s for 320 pairs × 4 detectors
 python 05_plot_match_counts.py     # reads matches/*.npz, writes the comparison plot
 python 06_pose_estimation.py       # ~10 s for 320 pairs × 4 detectors, incl. bridging
 python 07_trajectory_animation.py  # ~30 s; reads <det>_bridged.json (set DETECTOR at the top)
+python 08_loop_closures.py         # ~4 min (vocab build is the slow part); set DETECTOR at top
 ```
+
+`08_*` depends on `scipy.cluster.vq` (already required transitively). No
+sklearn dependency. The vocab-build step dominates runtime (~4 min); cache
+the centroids matrix to `.npy` if you iterate on retrieval params.
 
 ## On-disk format
 
@@ -71,14 +78,18 @@ data/260523_house/keyframes/
 │   └── <detector>/
 │       ├── pairwise_matches.npz         #   CSR-style match index (see below)
 │       └── pairwise_counts.csv          #   per-pair counts
-└── trajectories/                        # written by 06_pose_estimation.py
-    ├── <detector>.json                  #   raw: poses, segments, per-pair pose results
-    ├── <detector>_xz.png                #   raw per-detector XZ trajectory
-    ├── <detector>_bridged.json          #   after bridging failed pairs (06 step 2)
-    ├── <detector>_bridged_xz.png        #   raw vs bridged side-by-side, color = world_group
-    ├── <detector>_bridged_animated.mp4  #   written by 07_trajectory_animation.py
-    ├── <detector>_bridged_animation_final.png
-    └── comparison_xz.png                #   4-detector XZ overlay + Y-drift profile
+├── trajectories/                        # written by 06_pose_estimation.py
+│   ├── <detector>.json                  #   raw: poses, segments, per-pair pose results
+│   ├── <detector>_xz.png                #   raw per-detector XZ trajectory
+│   ├── <detector>_bridged.json          #   after bridging failed pairs (06 step 2)
+│   ├── <detector>_bridged_xz.png        #   raw vs bridged side-by-side, color = world_group
+│   ├── <detector>_bridged_animated.mp4  #   written by 07_trajectory_animation.py
+│   ├── <detector>_bridged_animation_final.png
+│   └── comparison_xz.png                #   4-detector XZ overlay + Y-drift profile
+└── loop_closures/                       # written by 08_loop_closures.py
+    ├── <detector>.json                  #   verified long-range edges (i, j, R, t, inlier_idx)
+    ├── <detector>_matrix.png            #   N×N BoW similarity heatmap; closures circled
+    └── <detector>_match_<i>_<j>.jpg     #   drawMatches overlay for the top-K closures
 ```
 
 ### Manifest — `keyframes.json`
@@ -257,6 +268,47 @@ Schema additions (only in the `_bridged.json` variant):
   a value live in the same world frame.
 - `extra.n_bridges` — count of successful boundary links.
 
+### Loop closures — `loop_closures/<detector>.json`
+
+`detect_loop_closures(store, cfg)` does TF-IDF BoW retrieval (visual vocabulary
+trained per run by `scipy.cluster.vq.kmeans2`) followed by essential-matrix
+geometry verification. Output is a flat list of long-range edges:
+
+```json
+{
+  "version": "1.0",
+  "detector": "sift",
+  "config": { "vocab_size": 512, "top_k": 5, "min_separation": 30,
+              "ratio": 0.75, "min_inliers": 30 },
+  "edges": [
+    {
+      "frame_a": 91, "frame_b": 121, "similarity": 0.786,
+      "n_matches": 1247, "n_inliers_model": 271, "n_inliers_pose": 154,
+      "R": [[...]], "t": [tx, ty, tz],
+      "inlier_idx": [...]
+    },
+    ...
+  ]
+}
+```
+
+Field notes:
+
+- `frame_a < frame_b` always; pair indices are *not* contiguous, unlike
+  `Trajectory.pairs`.
+- `R, t` follow the same convention as `Trajectory.pairs[i]` — `T_{b←a}` with
+  unit-norm `t`. The unit norm is a **scale conflict** against the chain's
+  accumulated drift, which is exactly what Sim(3) PGO is designed to resolve.
+- `inlier_idx` indexes into the **re-matched** descriptor list (Lowe ratio
+  on the full descriptor sets of frames `a` and `b`), not into the
+  consecutive-pair match arrays in `pairwise_matches.npz`. To recover the
+  `(queryIdx, trainIdx)` for BA, re-run the same Lowe match — it's
+  deterministic given identical `ratio`.
+
+The `min_separation` threshold (default 30 frames ≈ 3 s @ 10 fps) suppresses
+near-temporal candidates that would otherwise just look like the
+consecutive-pair chain. Tune up for slow scenes, down for fast ones.
+
 ## Library API
 
 ```python
@@ -383,3 +435,18 @@ failure cause): the `(0, 0)` skip-the-bad-frame offset closes 17–29 gaps per
 detector, collapsing 37–56 segments into 20–27 world groups. Remaining gaps
 fall in the all-detector-zero windows or true geometry-degenerate pairs —
 they are candidates for the PnP-based bridging or wider `skip_offsets`.
+
+**Loop closures** (SIFT, vocab=512, top_k=5, min_separation=30, min_inliers=30)
+
+- 47 verified loop closures from 585 retrieval candidates.
+- All revisits cluster between frames `[88–93]` and `[119–124]` — the camera
+  passed a dining/kitchen scene around frame 90, did ~30 frames of other
+  motion, and returned around frame 120.
+- Strongest edge: 91 ↔ 121 (sim 0.79, 154 essential-matrix inliers).
+- The all-detector-zero windows (frames 224–265) show up as a dim band on
+  the similarity matrix and produce zero closures, as expected.
+
+The cluster confirms the clip carries genuine cycles in the constraint graph
+— pose-graph optimization (Sim(3) for monocular) on the bridged trajectory
+plus these edges is now justified work. Dedupe the cluster down to 2–3
+strongest edges before feeding to the optimizer; the rest are redundant.
