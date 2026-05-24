@@ -15,11 +15,13 @@ database for the `260523_house` capture (`experiments/data/260523_house/sample.m
 | `06_pose_estimation.py` | 5-point essential-matrix (RANSAC) + recoverPose per detector; builds segmented monocular trajectory, bridges failed pairs into world-frame groups, renders raw + bridged plots | `data/260523_house/keyframes/trajectories/` |
 | `07_trajectory_animation.py` | Frame-by-frame MP4: current image + keypoint overlay (left) + accumulated XZ trajectory with current-camera marker (right) | `data/260523_house/keyframes/trajectories/<det>_bridged_animated.mp4` |
 | `08_loop_closures.py` | TF-IDF BoW retrieval (vocab trained per-detector) + essential-matrix geometry verification; emits long-range loop-closure edges for downstream pose-graph optimization | `data/260523_house/keyframes/loop_closures/` |
+| `09_pose_graph_optimization.py` | Sim(3) PGO via g2o: chain + bridge + loop-closure edges into a single graph, gauge-fixed at frame 0, Levenberg–Marquardt with Huber kernel; writes optimized trajectory + comparison plots | `data/260523_house/keyframes/trajectories/<det>_pgo.json` |
 | `keyframe.py` | Library: `Camera`, `FeatureSet`, `Keyframe`, `KeyframeStore`, detector adapters | — |
 | `pose.py` | Library: `RelativePose`, `EssentialMatrixEstimator`, `HomographyEstimator`, `Trajectory`, `bridge_segments`, `BridgeAttempt` | — |
 | `loop_closure.py` | Library: `LoopClosureConfig`, `LoopClosure`, `build_vocabulary` / `bow_histograms` / `retrieve_candidates` / `verify`, `detect_loop_closures` | — |
+| `sim3_pgo.py` | Library: `dedupe_loop_closures`, `optimize_sim3` (g2o-backed Sim(3) PGO), `trajectory_with_optimized_poses`, `PGOResult` | — |
 
-Pipeline order: `01 → 02 → 03 → 04 → 05 → 06 → 07 → 08`. Scripts ≥ 03 only read the
+Pipeline order: `01 → 02 → 03 → 04 → 05 → 06 → 07 → 08 → 09`. Scripts ≥ 03 only read the
 keyframe store and pre-computed sidecars, so they can be re-run independently.
 
 ### Frame extraction (manual, until `01_*` is filled in)
@@ -49,11 +51,16 @@ python 05_plot_match_counts.py     # reads matches/*.npz, writes the comparison 
 python 06_pose_estimation.py       # ~10 s for 320 pairs × 4 detectors, incl. bridging
 python 07_trajectory_animation.py  # ~30 s; reads <det>_bridged.json (set DETECTOR at the top)
 python 08_loop_closures.py         # ~4 min (vocab build is the slow part); set DETECTOR at top
+python 09_pose_graph_optimization.py  # <1 s; reads <det>_bridged.json + loop_closures/<det>.json
 ```
 
 `08_*` depends on `scipy.cluster.vq` (already required transitively). No
 sklearn dependency. The vocab-build step dominates runtime (~4 min); cache
 the centroids matrix to `.npy` if you iterate on retrieval params.
+
+`09_*` depends on `g2o` (python binding). The optimizer itself runs in
+milliseconds for 300-node graphs; the heavy lifting was already done by
+`06_*` and `08_*`.
 
 ## On-disk format
 
@@ -85,6 +92,9 @@ data/260523_house/keyframes/
 │   ├── <detector>_bridged_xz.png        #   raw vs bridged side-by-side, color = world_group
 │   ├── <detector>_bridged_animated.mp4  #   written by 07_trajectory_animation.py
 │   ├── <detector>_bridged_animation_final.png
+│   ├── <detector>_pgo.json              #   Sim(3)-optimized trajectory (09)
+│   ├── <detector>_pgo_xz.png            #   bridged vs PGO side-by-side
+│   ├── <detector>_pgo_scales.png        #   per-node optimized scale
 │   └── comparison_xz.png                #   4-detector XZ overlay + Y-drift profile
 └── loop_closures/                       # written by 08_loop_closures.py
     ├── <detector>.json                  #   verified long-range edges (i, j, R, t, inlier_idx)
@@ -309,6 +319,52 @@ The `min_separation` threshold (default 30 frames ≈ 3 s @ 10 fps) suppresses
 near-temporal candidates that would otherwise just look like the
 consecutive-pair chain. Tune up for slow scenes, down for fast ones.
 
+### Sim(3) PGO — `trajectories/<detector>_pgo.json`
+
+`optimize_sim3(traj, closures)` builds a g2o `SparseOptimizer` with
+`VertexSim3Expmap` nodes (one per valid frame, storing `Scw`) and three
+edge populations:
+
+- **chain edges** from `traj.pairs` where `success=True` — measurement
+  `Sba = (R, t, 1)` from the relative pose, weighted by `n_inliers_pose`.
+- **bridge edges** synthesized from `extra["world_group"]` — for every
+  pair of adjacent segments sharing a world group, the relative `T_ba`
+  derived from the bridged poses, with moderate (`0.5 * I`) info weight.
+- **loop-closure edges** loaded from `loop_closures/<detector>.json`,
+  passed through `dedupe_loop_closures(closures, nms_window=5)` to keep
+  only the strongest edge per `(frame_a±w, frame_b±w)` cluster.
+
+Gauge is fixed by `set_fixed(True)` on the first valid frame. Solver:
+Levenberg–Marquardt with `LinearSolverEigenSim3`, Huber kernel
+(`delta ≈ √7` ≈ 2.6 — one sigma on the 7-DoF Sim(3) tangent residual).
+
+Schema additions on `_pgo.json` (on top of the bridged variant):
+
+- `method` — appended with `"+sim3pgo"`.
+- `poses_wc[i]` — optimized; the per-node scale is **baked into the
+  translation column** so positions are scale-corrected, but the 3×3
+  rotation block stays orthonormal. Downstream code that needs the raw
+  Sim(3) transform should multiply the rotation block by `pgo_scales[i]`.
+- `extra.pgo_scales` — `list[float]` of length N, optimized scale per node
+  (1.0 for invalid frames).
+- `extra.pgo_initial_chi2`, `extra.pgo_final_chi2`,
+  `extra.pgo_n_chain`, `extra.pgo_n_bridge`, `extra.pgo_n_loop`.
+
+**Why Sim(3) is required (not SE(3))**: every chain/bridge/loop-closure
+edge in this pipeline carries `‖t‖ = 1` (monocular convention). Pure SE(3)
+PGO cannot reconcile a loop-closure unit-norm `t` with the chain's
+accumulated unit-norm steps; the residual is degenerate in the scale
+direction. Sim(3) gives each node its own scale variable, and the
+optimizer distributes scale around the loop to make the constraints
+consistent.
+
+**Data-limitation note**: PGO can only refine the connected component of
+the graph that touches a loop closure. Segments in world groups with no
+loop-closure edge keep `scale = 1.0` (their bridged initial pose). The
+SIFT result here shows a 5× scale span [0.27, 1.33] in the loop region
+and `s = 1.0` everywhere else — a faithful reflection of which parts of
+the trajectory the data actually constrains, not a bug.
+
 ## Library API
 
 ```python
@@ -439,14 +495,26 @@ they are candidates for the PnP-based bridging or wider `skip_offsets`.
 **Loop closures** (SIFT, vocab=512, top_k=5, min_separation=30, min_inliers=30)
 
 - 47 verified loop closures from 585 retrieval candidates.
-- All revisits cluster between frames `[88–93]` and `[119–124]` — the camera
-  passed a dining/kitchen scene around frame 90, did ~30 frames of other
-  motion, and returned around frame 120.
-- Strongest edge: 91 ↔ 121 (sim 0.79, 154 essential-matrix inliers).
+- After `dedupe_loop_closures(nms_window=5)`: **6 representative edges**, including
+  the strongest 91 ↔ 121 (sim 0.79, 154 inliers) plus secondary clusters
+  like 33 ↔ 101 and 39 ↔ 86 (longer-range revisits).
 - The all-detector-zero windows (frames 224–265) show up as a dim band on
   the similarity matrix and produce zero closures, as expected.
 
-The cluster confirms the clip carries genuine cycles in the constraint graph
-— pose-graph optimization (Sim(3) for monocular) on the bridged trajectory
-plus these edges is now justified work. Dedupe the cluster down to 2–3
-strongest edges before feeding to the optimizer; the rest are redundant.
+**Sim(3) PGO** (SIFT, bridged + 6 loop-closure edges)
+
+| metric | value |
+|---|---|
+| vertices | 272 (valid frames only) |
+| chain / bridge / loop edges | 222 / 29 / 6 |
+| χ² | **2141 → 24.84 (98.8% reduction)** |
+| per-node scale span | **[0.27, 1.33]** — 5× spread |
+| runtime (30 LM iterations) | 0.14 s |
+
+The scale plot reveals the structure of the data: scales are pinned at 1.0
+before the first loop closure (frames 0–30), collapse to ~0.3 in the loop
+region (frames 30–130, where the chain claimed unit-norm steps but the
+revisit proved those steps were 3× shorter), jump to ~1.33 in the next
+world group (frames 130–225), and return to 1.0 for the final disconnected
+group (frames 225+). World groups untouched by any loop closure cannot be
+refined and keep their bridged initial pose — exactly what we'd expect.
