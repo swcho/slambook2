@@ -12,11 +12,12 @@ database for the `260523_house` capture (`experiments/data/260523_house/sample.m
 | `03_visualize_keypoints.py` | Per-detector keypoint overlay on representative frames | `data/260523_house/keyframes/viz/` |
 | `04_match_pairwise.py` | i ↔ i+1 Lowe-ratio matching for all detectors; saves indices + counts + sample drawMatches | `data/260523_house/keyframes/matches/` |
 | `05_plot_match_counts.py` | Linear + log plots of matches/frame, shading all-detector-zero runs | `data/260523_house/keyframes/matches/match_counts_by_detector.png` |
-| `06_pose_estimation.py` | 5-point essential-matrix (RANSAC) + recoverPose per detector; builds segmented monocular trajectory + plots | `data/260523_house/keyframes/trajectories/` |
+| `06_pose_estimation.py` | 5-point essential-matrix (RANSAC) + recoverPose per detector; builds segmented monocular trajectory, bridges failed pairs into world-frame groups, renders raw + bridged plots | `data/260523_house/keyframes/trajectories/` |
+| `07_trajectory_animation.py` | Frame-by-frame MP4: current image + keypoint overlay (left) + accumulated XZ trajectory with current-camera marker (right) | `data/260523_house/keyframes/trajectories/<det>_bridged_animated.mp4` |
 | `keyframe.py` | Library: `Camera`, `FeatureSet`, `Keyframe`, `KeyframeStore`, detector adapters | — |
-| `pose.py` | Library: `RelativePose`, `EssentialMatrixEstimator`, `HomographyEstimator`, `Trajectory` | — |
+| `pose.py` | Library: `RelativePose`, `EssentialMatrixEstimator`, `HomographyEstimator`, `Trajectory`, `bridge_segments`, `BridgeAttempt` | — |
 
-Pipeline order: `01 → 02 → 03 → 04 → 05 → 06`. Scripts ≥ 03 only read the
+Pipeline order: `01 → 02 → 03 → 04 → 05 → 06 → 07`. Scripts ≥ 03 only read the
 keyframe store and pre-computed sidecars, so they can be re-run independently.
 
 ### Frame extraction (manual, until `01_*` is filled in)
@@ -43,7 +44,8 @@ Runtime: ~100 s for 321 frames × 4 detectors on the reference machine.
 python 03_visualize_keypoints.py   # overlays on 5 sample frames × 4 detectors
 python 04_match_pairwise.py        # ~11 s for 320 pairs × 4 detectors
 python 05_plot_match_counts.py     # reads matches/*.npz, writes the comparison plot
-python 06_pose_estimation.py       # ~10 s for 320 pairs × 4 detectors
+python 06_pose_estimation.py       # ~10 s for 320 pairs × 4 detectors, incl. bridging
+python 07_trajectory_animation.py  # ~30 s; reads <det>_bridged.json (set DETECTOR at the top)
 ```
 
 ## On-disk format
@@ -70,8 +72,12 @@ data/260523_house/keyframes/
 │       ├── pairwise_matches.npz         #   CSR-style match index (see below)
 │       └── pairwise_counts.csv          #   per-pair counts
 └── trajectories/                        # written by 06_pose_estimation.py
-    ├── <detector>.json                  #   poses, segments, per-pair pose results
-    ├── <detector>_xz.png                #   per-detector XZ trajectory
+    ├── <detector>.json                  #   raw: poses, segments, per-pair pose results
+    ├── <detector>_xz.png                #   raw per-detector XZ trajectory
+    ├── <detector>_bridged.json          #   after bridging failed pairs (06 step 2)
+    ├── <detector>_bridged_xz.png        #   raw vs bridged side-by-side, color = world_group
+    ├── <detector>_bridged_animated.mp4  #   written by 07_trajectory_animation.py
+    ├── <detector>_bridged_animation_final.png
     └── comparison_xz.png                #   4-detector XZ overlay + Y-drift profile
 ```
 
@@ -157,8 +163,8 @@ qt, dd = pairs[lo:hi], dists[lo:hi]            # (m, 2), (m,)
 ### Trajectory — `trajectories/<detector>.json`
 
 Per-detector monocular trajectory built by `06_pose_estimation.py`. JSON
-because it's small (~300 KB per detector) and human-inspectable. One file per
-detector × method.
+because it's human-inspectable. ~300 KB per detector for poses alone; with
+`inlier_idx` (see below) it grows to ~2–3 MB per detector.
 
 ```json
 {
@@ -174,10 +180,12 @@ detector × method.
     {
       "frame_a": 0, "frame_b": 1, "success": true, "method": "essential_ransac",
       "n_matches": 329, "n_inliers_model": 280, "n_inliers_pose": 215,
-      "R": [[...]], "t": [tx, ty, tz]
+      "R": [[...]], "t": [tx, ty, tz],
+      "inlier_idx": [3, 7, 11, 14, ...]  // indices into the match array; len == n_inliers_pose
     },
     ...
-  ]
+  ],
+  "extra": {}                            // bridged variant adds "world_group", "n_bridges"
 }
 ```
 
@@ -192,9 +200,62 @@ Field notes:
   and rotation are meaningful; absolute distance is not.
 - `pairs[i].R, t` define the camera-b-from-camera-a transform `T_{b←a}`
   (i.e. `x_b = R · x_a + t`).
+- `pairs[i].inlier_idx` — indices into the pair's match array
+  (`matches/<det>/pairwise_matches.npz[offsets[i]:offsets[i+1]]`) identifying
+  which correspondences passed RANSAC + cheirality and produced `(R, t)`. Use
+  with `store.frames[a/b][det].xy` to rebuild per-feature reprojection
+  residuals for non-linear optimization (BA / pose-graph). `null` when
+  `success=false`; empty array on pre-`inlier_idx` files (backwards-compat).
 
 Accumulation rule used to fill `poses_wc`:
 `T_wc[i+1] = T_wc[i] · inv(T_{b←a})  =  T_wc[i] · [R^T | -R^T t]`.
+
+Rebuilding inlier observations for BA:
+
+```python
+with np.load(MATCH_DIR / det / "pairwise_matches.npz") as z:
+    offsets, pairs_idx = z["offsets"], z["pairs"]
+
+for p in traj.pairs:
+    if not p.success:
+        continue
+    qt = pairs_idx[int(offsets[p.frame_a]):int(offsets[p.frame_a + 1])]
+    inlier_qt = qt[p.inlier_idx]                                    # (n_in, 2)
+    xy_a = store.frames[p.frame_a][det].xy[inlier_qt[:, 0]]         # (n_in, 2)
+    xy_b = store.frames[p.frame_b][det].xy[inlier_qt[:, 1]]         # (n_in, 2)
+    # → feed to pyceres / g2o / gtsam as reprojection-error residual blocks
+```
+
+### Bridging — `trajectories/<detector>_bridged.json`
+
+`bridge_segments(traj, store)` re-runs feature matching + essential-matrix
+estimation (with homography fallback) across each segment boundary, trying
+skip-frame candidates `(eA - 1 - di, sB + dj)` for small `(di, dj)`. The
+common case `(0, 0)` skips the single bad keyframe between two segments and
+recovers the link; rarer wider offsets handle short blur runs.
+
+If the link succeeds for boundary `(k, k+1)`, segment `k+1`'s poses are
+transformed into segment `k`'s world frame and `world_group[k+1] = world_group[k]`.
+Two segments share a world frame iff their `world_group` values match.
+
+Bridging recovers **rotation + unit-norm translation direction** but **not
+metric scale** — each pair contributes one unit step, just like in
+`from_pairs`. The invalid frame between bridged segments stays invalid, so
+`positions[]` still has NaN there; `Line2D` auto-breaks at that single frame,
+but the surrounding poses are continuous.
+
+Bridge poses set `inlier_idx` against the re-matched `pts_a/pts_b` arrays
+built inside `_bridge_match`, but those match arrays are **not persisted** —
+only the original i ↔ i+1 matches live in `pairwise_matches.npz`. To feed
+bridge edges into BA, `_bridge_match` would need to also return the
+`(queryIdx, trainIdx)` arrays for storage alongside the bridge `RelativePose`.
+
+Schema additions (only in the `_bridged.json` variant):
+
+- `method` — `"essential_ransac+bridge"`.
+- `extra.world_group` — `list[int]` of length `len(segments)`. Segments sharing
+  a value live in the same world frame.
+- `extra.n_bridges` — count of successful boundary links.
 
 ## Library API
 
@@ -231,7 +292,7 @@ store.save()                                    # writes manifest + sidecars
 Pose estimation + trajectory:
 
 ```python
-from pose import EssentialMatrixEstimator, Trajectory
+from pose import EssentialMatrixEstimator, Trajectory, bridge_segments
 
 estimator = EssentialMatrixEstimator(threshold_px=1.0, min_inliers_pose=15)
 pair_results = [estimator.estimate(pts_a, pts_b, K, frame_a=i, frame_b=i+1)
@@ -242,8 +303,15 @@ traj = Trajectory.from_pairs(
     frame_ids=[kf.id for kf in store.frames], pairs=pair_results,
 )
 traj.save("trajectories/sift.json")
-traj.positions          # (N, 3) — NaN where invalid
+traj.positions            # (N, 3) — NaN where invalid
 traj.segment_positions()  # list[(M, 3)] — one per contiguous segment
+
+bridged, attempts = bridge_segments(traj, store)   # store has descriptors
+bridged.extra["world_group"]   # list[int] — segments sharing a world frame
+bridged.extra["n_bridges"]     # int — number of boundaries successfully linked
+bridged.save("trajectories/sift_bridged.json")
+for a in attempts:             # inspect why bridges succeeded/failed
+    print(a)                   # e.g. <Bridge ok seg3->4 f161-163 homography:0,0 m=1320 in=1063>
 ```
 
 ## Why this format
@@ -296,12 +364,12 @@ needs a re-init / loop-closure strategy across the three red windows above.
 **Pose estimation** (5-point essential + RANSAC, `threshold_px=1.0`,
 `min_inliers_pose=15`)
 
-| detector | successful pairs | valid frames | # segments | longest segment |
-|---|---|---|---|---|
-| SIFT  | 240 / 320 | 272 / 321 | 50 | 72 |
-| ORB   | 245 / 320 | 275 / 321 | 47 | 49 |
-| AKAZE | 258 / 320 | 285 / 321 | 37 | 93 |
-| BRISK | 222 / 320 | 265 / 321 | 56 | 57 |
+| detector | successful pairs | valid frames | # segments | longest segment | world groups (post-bridge) | gaps closed |
+|---|---|---|---|---|---|---|
+| SIFT  | 240 / 320 | 272 / 321 | 50 | 72 | 21 | 29 / 49 |
+| ORB   | 245 / 320 | 275 / 321 | 47 | 49 | 27 | 20 / 46 |
+| AKAZE | 258 / 320 | 285 / 321 | 37 | 93 | 20 | 17 / 36 |
+| BRISK | 222 / 320 | 265 / 321 | 56 | 57 | 27 | 29 / 55 |
 
 AKAZE again wins — fewest segments (37) and longest continuous segment
 (93 frames). The big curved arc visible in the XZ plots corresponds to that
@@ -309,3 +377,9 @@ AKAZE again wins — fewest segments (37) and longest continuous segment
 mostly because of the three all-detector-zero windows already noted plus a
 handful of geometry-degenerate pairs (pure rotation, planar scenes) where
 `recoverPose` returns < 15 cheirality inliers.
+
+`bridge_segments` recovers the single-bad-frame boundaries (most common
+failure cause): the `(0, 0)` skip-the-bad-frame offset closes 17–29 gaps per
+detector, collapsing 37–56 segments into 20–27 world groups. Remaining gaps
+fall in the all-detector-zero windows or true geometry-degenerate pairs —
+they are candidates for the PnP-based bridging or wider `skip_offsets`.

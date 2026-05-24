@@ -47,6 +47,11 @@ class RelativePose:
     n_inliers_pose: int       # inliers passing cheirality (essential only)
     R: np.ndarray = field(default_factory=lambda: np.eye(3))   # (3,3) T_{b<-a}
     t: np.ndarray = field(default_factory=lambda: np.zeros(3))  # (3,) unit-norm
+    # Indices into the (pts_a, pts_b) arrays passed to estimate() identifying
+    # which correspondences voted for the final (R, t). Use with the original
+    # match arrays to rebuild per-feature reprojection residuals for BA /
+    # pose-graph optimization. Empty when success=False.
+    inlier_idx: np.ndarray = field(default_factory=lambda: np.zeros(0, np.int32))
 
     def T_ba(self) -> np.ndarray:
         T = np.eye(4)
@@ -99,13 +104,14 @@ class EssentialMatrixEstimator:
             return out
         out.n_inliers_model = int(mask_e.sum())
 
-        n_pose, R, t, _ = cv2.recoverPose(E, pts_a, pts_b, K, mask=mask_e)
+        n_pose, R, t, mask_pose = cv2.recoverPose(E, pts_a, pts_b, K, mask=mask_e)
         out.n_inliers_pose = int(n_pose)
         if n_pose < self.min_inliers_pose:
             return out
 
         out.R = R.astype(np.float64)
         out.t = t.ravel().astype(np.float64)
+        out.inlier_idx = np.where(mask_pose.ravel() > 0)[0].astype(np.int32)
         out.success = True
         return out
 
@@ -147,18 +153,22 @@ class HomographyEstimator:
 
         # Cheirality: pick (R, t) maximizing # inliers in front of both cameras.
         inliers = mask.ravel().astype(bool)
+        inlier_orig_idx = np.where(inliers)[0]
         ia = _to_normalized(pts_a[inliers], K)
         ib = _to_normalized(pts_b[inliers], K)
 
         best_count, best_R, best_t = -1, Rs[0], ts[0]
+        best_mask = np.zeros(len(ia), dtype=bool)
         for R, t in zip(Rs, ts):
-            count = _cheirality_count(R, t.ravel(), ia, ib)
+            cmask = _cheirality_mask(R, t.ravel(), ia, ib)
+            count = int(cmask.sum())
             if count > best_count:
-                best_count, best_R, best_t = count, R, t.ravel()
+                best_count, best_R, best_t, best_mask = count, R, t.ravel(), cmask
 
         out.R = best_R.astype(np.float64)
         out.t = (best_t / max(np.linalg.norm(best_t), 1e-12)).astype(np.float64)
         out.n_inliers_pose = int(best_count)
+        out.inlier_idx = inlier_orig_idx[best_mask].astype(np.int32)
         out.success = best_count >= 8
         return out
 
@@ -171,17 +181,17 @@ def _to_normalized(pts: np.ndarray, K: np.ndarray) -> np.ndarray:
     return n[:, :2]
 
 
-def _cheirality_count(R: np.ndarray, t: np.ndarray,
-                      ia: np.ndarray, ib: np.ndarray) -> int:
-    """How many triangulated points lie in front of both cameras."""
+def _cheirality_mask(R: np.ndarray, t: np.ndarray,
+                     ia: np.ndarray, ib: np.ndarray) -> np.ndarray:
+    """Per-point bool mask: triangulated point lies in front of both cameras."""
     if len(ia) == 0:
-        return 0
+        return np.zeros(0, dtype=bool)
     P1 = np.hstack([np.eye(3), np.zeros((3, 1))])
     P2 = np.hstack([R, t.reshape(3, 1)])
     pts4d = cv2.triangulatePoints(P1, P2, ia.T, ib.T)
     X1 = pts4d[:3] / np.where(pts4d[3:4] != 0, pts4d[3:4], 1e-12)
     X2 = R @ X1 + t.reshape(3, 1)
-    return int(np.sum((X1[2] > 0) & (X2[2] > 0)))
+    return (X1[2] > 0) & (X2[2] > 0)
 
 
 # --------------------------------------------------------------------------- #
@@ -294,6 +304,7 @@ class Trajectory:
                     "n_inliers_pose": int(p.n_inliers_pose),
                     "R": p.R.tolist() if p.success else None,
                     "t": p.t.tolist() if p.success else None,
+                    "inlier_idx": p.inlier_idx.tolist() if p.success else None,
                 }
                 for p in self.pairs
             ],
@@ -332,6 +343,8 @@ class Trajectory:
             if pd["success"]:
                 rp.R = np.array(pd["R"], dtype=np.float64)
                 rp.t = np.array(pd["t"], dtype=np.float64)
+                if pd.get("inlier_idx") is not None:
+                    rp.inlier_idx = np.array(pd["inlier_idx"], dtype=np.int32)
             pairs.append(rp)
 
         return cls(
