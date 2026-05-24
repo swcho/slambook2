@@ -12,10 +12,12 @@ database for the `260523_house` capture (`experiments/data/260523_house/sample.m
 | `03_visualize_keypoints.py` | Per-detector keypoint overlay on representative frames | `data/260523_house/keyframes/viz/` |
 | `04_match_pairwise.py` | i ↔ i+1 Lowe-ratio matching for all detectors; saves indices + counts + sample drawMatches | `data/260523_house/keyframes/matches/` |
 | `05_plot_match_counts.py` | Linear + log plots of matches/frame, shading all-detector-zero runs | `data/260523_house/keyframes/matches/match_counts_by_detector.png` |
+| `06_pose_estimation.py` | 5-point essential-matrix (RANSAC) + recoverPose per detector; builds segmented monocular trajectory + plots | `data/260523_house/keyframes/trajectories/` |
 | `keyframe.py` | Library: `Camera`, `FeatureSet`, `Keyframe`, `KeyframeStore`, detector adapters | — |
+| `pose.py` | Library: `RelativePose`, `EssentialMatrixEstimator`, `HomographyEstimator`, `Trajectory` | — |
 
-Pipeline order: `01 → 02 → 03 → 04 → 05`. Scripts ≥ 03 only read the keyframe
-store, so they can be re-run independently.
+Pipeline order: `01 → 02 → 03 → 04 → 05 → 06`. Scripts ≥ 03 only read the
+keyframe store and pre-computed sidecars, so they can be re-run independently.
 
 ### Frame extraction (manual, until `01_*` is filled in)
 
@@ -41,6 +43,7 @@ Runtime: ~100 s for 321 frames × 4 detectors on the reference machine.
 python 03_visualize_keypoints.py   # overlays on 5 sample frames × 4 detectors
 python 04_match_pairwise.py        # ~11 s for 320 pairs × 4 detectors
 python 05_plot_match_counts.py     # reads matches/*.npz, writes the comparison plot
+python 06_pose_estimation.py       # ~10 s for 320 pairs × 4 detectors
 ```
 
 ## On-disk format
@@ -59,13 +62,17 @@ data/260523_house/keyframes/
 ├── viz/                                 # written by 03_visualize_keypoints.py
 │   ├── sample_keypoints.png             #   frames × detectors grid
 │   └── <frame_id>_<detector>.jpg        #   per-(frame,detector) overlay
-└── matches/                             # written by 04_match_pairwise.py
-    ├── pairwise_counts.png              #   4-detector overlay (lin scale)
-    ├── match_counts_by_detector.png     #   5_plot — lin + log, zero-runs shaded
-    ├── sample_match_<detector>.jpg      #   drawMatches example pair
-    └── <detector>/
-        ├── pairwise_matches.npz         #   CSR-style match index (see below)
-        └── pairwise_counts.csv          #   per-pair counts
+├── matches/                             # written by 04_match_pairwise.py
+│   ├── pairwise_counts.png              #   4-detector overlay (lin scale)
+│   ├── match_counts_by_detector.png     #   5_plot — lin + log, zero-runs shaded
+│   ├── sample_match_<detector>.jpg      #   drawMatches example pair
+│   └── <detector>/
+│       ├── pairwise_matches.npz         #   CSR-style match index (see below)
+│       └── pairwise_counts.csv          #   per-pair counts
+└── trajectories/                        # written by 06_pose_estimation.py
+    ├── <detector>.json                  #   poses, segments, per-pair pose results
+    ├── <detector>_xz.png                #   per-detector XZ trajectory
+    └── comparison_xz.png                #   4-detector XZ overlay + Y-drift profile
 ```
 
 ### Manifest — `keyframes.json`
@@ -147,6 +154,48 @@ lo, hi = int(offs[p]), int(offs[p + 1])
 qt, dd = pairs[lo:hi], dists[lo:hi]            # (m, 2), (m,)
 ```
 
+### Trajectory — `trajectories/<detector>.json`
+
+Per-detector monocular trajectory built by `06_pose_estimation.py`. JSON
+because it's small (~300 KB per detector) and human-inspectable. One file per
+detector × method.
+
+```json
+{
+  "version": "1.0",
+  "detector": "sift",
+  "method": "essential_ransac",
+  "camera": { ... COLMAP camera ... },
+  "frame_ids":  ["frame_00001", ..., "frame_00321"],
+  "valid":      [true, true, ..., false, true],
+  "segments":   [[0, 73], [74, 130], ...],
+  "poses_wc":   [[[...4x4...]], null, [[...]], ...],
+  "pairs": [
+    {
+      "frame_a": 0, "frame_b": 1, "success": true, "method": "essential_ransac",
+      "n_matches": 329, "n_inliers_model": 280, "n_inliers_pose": 215,
+      "R": [[...]], "t": [tx, ty, tz]
+    },
+    ...
+  ]
+}
+```
+
+Field notes:
+
+- `poses_wc[i]` — 4×4 world-from-camera matrix, or `null` if the frame has no
+  valid pose. NaN-equivalent for JSON.
+- `segments[k] = [start, end)` — half-open intervals of contiguous valid
+  frames. Across segments the world frames are **unrelated** — a failed pair
+  breaks the chain, so each segment starts at its own identity origin.
+- `pairs[i].t` is **unit-norm** (monocular scale ambiguity). Trajectory shape
+  and rotation are meaningful; absolute distance is not.
+- `pairs[i].R, t` define the camera-b-from-camera-a transform `T_{b←a}`
+  (i.e. `x_b = R · x_a + t`).
+
+Accumulation rule used to fill `poses_wc`:
+`T_wc[i+1] = T_wc[i] · inv(T_{b←a})  =  T_wc[i] · [R^T | -R^T t]`.
+
 ## Library API
 
 ```python
@@ -177,6 +226,24 @@ kf = Keyframe(id="frame_00001", image_path="images/frame_00001.jpg")
 kf.features["sift"] = sift.detect_and_compute(gray)
 store.add_frame(kf)
 store.save()                                    # writes manifest + sidecars
+```
+
+Pose estimation + trajectory:
+
+```python
+from pose import EssentialMatrixEstimator, Trajectory
+
+estimator = EssentialMatrixEstimator(threshold_px=1.0, min_inliers_pose=15)
+pair_results = [estimator.estimate(pts_a, pts_b, K, frame_a=i, frame_b=i+1)
+                for i, (pts_a, pts_b) in enumerate(pair_iter)]
+
+traj = Trajectory.from_pairs(
+    detector="sift", method=estimator.method, camera=store.camera,
+    frame_ids=[kf.id for kf in store.frames], pairs=pair_results,
+)
+traj.save("trajectories/sift.json")
+traj.positions          # (N, 3) — NaN where invalid
+traj.segment_positions()  # list[(M, 3)] — one per contiguous segment
 ```
 
 ## Why this format
@@ -225,3 +292,20 @@ caused by a near-blank wall / motion-blur segment in the source clip:
 AKAZE leads at every threshold ≥ 10; ORB is second by virtue of its 2000-kp
 cap producing a flatter distribution. Any tracking pipeline on this clip
 needs a re-init / loop-closure strategy across the three red windows above.
+
+**Pose estimation** (5-point essential + RANSAC, `threshold_px=1.0`,
+`min_inliers_pose=15`)
+
+| detector | successful pairs | valid frames | # segments | longest segment |
+|---|---|---|---|---|
+| SIFT  | 240 / 320 | 272 / 321 | 50 | 72 |
+| ORB   | 245 / 320 | 275 / 321 | 47 | 49 |
+| AKAZE | 258 / 320 | 285 / 321 | 37 | 93 |
+| BRISK | 222 / 320 | 265 / 321 | 56 | 57 |
+
+AKAZE again wins — fewest segments (37) and longest continuous segment
+(93 frames). The big curved arc visible in the XZ plots corresponds to that
+93-frame run; outside of it the trajectory shatters into many short segments,
+mostly because of the three all-detector-zero windows already noted plus a
+handful of geometry-degenerate pairs (pure rotation, planar scenes) where
+`recoverPose` returns < 15 cheirality inliers.
